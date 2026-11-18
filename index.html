@@ -257,15 +257,16 @@ function holeVals(r,pid){
 }
 function calc(c,hi,hv){
   const ph=playingHcp(hi,c);
-  let thru=0,gross=0,par=0,stb=0,net=0,conflicts=0,unconf=0;
+  let thru=0,gross=0,par=0,stb=0,net=0,conflicts=0,unconf=0;const hs=Array(18).fill(0);
   hv.forEach((x,h)=>{
     if(x.st==="conflict"){conflicts++;return}
     if(x.st==="none") return;
     const s=strokesOn(ph,c.si[h]);
-    thru++;gross+=x.v;par+=c.par[h];net+=x.v-s;stb+=Math.max(0,c.par[h]+s-x.v+2);
+    thru++;gross+=x.v;par+=c.par[h];net+=x.v-s;const hp=Math.max(0,c.par[h]+s-x.v+2);stb+=hp;hs[h]=hp;
     if(x.st==="one") unconf++;
   });
-  return {hi,ph,hv,thru,gross,par,toPar:gross-par,netToPar:net-par,stb,conflicts,unconf};
+  const cb=[9,12,15,17].map(f=>sum(hs.slice(f)));
+  return {hi,ph,hv,thru,gross,par,toPar:gross-par,netToPar:net-par,stb,cb,conflicts,unconf};
 }
 function playerTotals(r,pid){
   const hi=(r.hcp&&r.hcp[pid]!=null)?r.hcp[pid]:(D().players[pid]?.hi??0);
@@ -288,12 +289,21 @@ function conflictList(r){
 function pctTop(n){return Math.min(100,40+5*n)}
 function pctPts(k,n){const w=pctTop(n);return n>1?w/2+(w/2)*(n-1-k)/(n-1):w}
 const isGuest=pid=>pid.startsWith("g-")||!!D().players[pid]?.guest;
+// Lige stableford afgøres på de sidste 9, 6, 3 og 1 hul (stableford), derefter laveste handicap.
+// Importerede runder (2026) har ikke huldata; der deler man stadig.
+function dayCmp(a,b){
+  if(b.stb!==a.stb) return b.stb-a.stb;
+  if(!a.cb||!b.cb) return 0;
+  for(let k=0;k<4;k++) if(b.cb[k]!==a.cb[k]) return b.cb[k]-a.cb[k];
+  if(a.hi!=null&&b.hi!=null&&a.hi!==b.hi) return a.hi-b.hi;
+  return 0;
+}
 function dayPoints(r,cfg){
   // placering efter stableford; delte placeringer deler pointene
-  const res=Object.entries(r.results||{}).filter(([pid,v])=>v.holes>0&&!isGuest(pid)).map(([pid,v])=>({pid,stb:v.stb})).sort((a,b)=>b.stb-a.stb);
+  const res=Object.entries(r.results||{}).filter(([pid,v])=>v.holes>0&&!isGuest(pid)).map(([pid,v])=>({pid,stb:v.stb,cb:v.cb,hi:v.hi})).sort(dayCmp);
   const mult=isFinale(r)?cfg.finaleMult:1,out={};
   for(let i=0;i<res.length;){
-    let j=i;while(j<res.length&&res[j].stb===res[i].stb)j++;
+    let j=i;while(j<res.length&&dayCmp(res[j],res[i])===0)j++;
     let t=0;for(let k=i;k<j;k++)t+=cfg.mode==="stb"?res[k].stb:cfg.mode==="pct"?pctPts(k,res.length):cfg.mode==="field"?res.length-k:(cfg.scale[k]??cfg.scale[cfg.scale.length-1]??0);
     for(let k=i;k<j;k++)out[res[k].pid]={pts:Math.round(mult*t/(j-i)*10)/10,pos:i+1,tie:j-i>1,stb:res[k].stb};
     i=j;
@@ -308,15 +318,16 @@ function seasonTable(per){
   rounds.forEach(r=>Object.entries(dayPoints(r,cfg)).forEach(([pid,v])=>{
     if(D().players[pid]?.guest) return;
     const a=agg[pid]||(agg[pid]={pid,cells:{},list:[],wins:0});
-    a.cells[r.id]=v;a.list.push({rid:r.id,pts:v.pts});if(v.pos===1)a.wins++;
+    a.cells[r.id]=v;a.list.push({rid:r.id,pts:v.pts,fin:isFinale(r)});if(v.pos===1)a.wins++;
   }));
   const rows=Object.values(agg).map(a=>{
     const sorted=a.list.slice().sort((x,y)=>y.pts-x.pts||x.rid.localeCompare(y.rid));
     const best=cfg.bestOf>0?sorted.slice(0,cfg.bestOf):sorted;
-    return {...a,n:a.list.length,total:Math.round(sum(best.map(x=>x.pts))*10)/10,counting:new Set(best.map(x=>x.rid))};
+    return {...a,n:a.list.length,fin:Math.round(sum(a.list.filter(x=>x.fin).map(x=>x.pts))*10)/10,top:Math.max(0,...a.list.map(x=>x.pts)),total:Math.round(sum(best.map(x=>x.pts))*10)/10,counting:new Set(best.map(x=>x.rid))};
   });
-  rows.sort((a,b)=>b.total-a.total||b.wins-a.wins||b.n-a.n||pname(a.pid).localeCompare(pname(b.pid),"da"));
-  let pos=0;rows.forEach((r,i)=>{if(i===0||r.total!==rows[i-1].total)pos=i+1;r.pos=pos});
+  const tb=cfg.mode==="stb"?(a,b)=>b.total-a.total:(a,b)=>b.total-a.total||b.wins-a.wins||b.fin-a.fin||b.top-a.top;
+  rows.sort((a,b)=>tb(a,b)||pname(a.pid).localeCompare(pname(b.pid),"da"));
+  let pos=0;rows.forEach((r,i)=>{if(i===0||tb(r,rows[i-1])!==0)pos=i+1;r.pos=pos});
   return {rows,rounds,cfg};
 }
 
@@ -752,7 +763,8 @@ function cfgHtml(c){
     <li>Sidstepladsen får halvdelen af vinderens point. Alle andre får point med lige store spring imellem.</li>
     <li>${c.bestOf>0?`Dine ${c.bestOf} bedste tirsdage tæller i sæsonen.`:"Alle tirsdage tæller i sæsonen."}</li>
     <li>De to finaler giver ${mult} point.</li>
-    <li>Står flere lige, deler de pointene.</li></ol>
+    <li>Lige stilling på en tirsdag: den med flest stablefordpoint på de sidste 9 huller vinder. Er de stadig lige, ser vi på de sidste 6, 3 og til sidst det 18. hul. Er de stadig lige, vinder den med lavest handicap.</li>
+    <li>Lige stilling i sæsonen: først tæller flest vundne tirsdage, så flest point i de to finaler og så det højeste pointtal på én tirsdag. Er de stadig lige, trækker administratoren lod.</li></ol>
     <table class="small" style="border-collapse:collapse;margin:0 0 10px;text-align:right"><tr style="color:var(--muted)"><th style="text-align:right;padding:2px 10px 2px 0">Deltagere</th><th style="padding:2px 10px">Vinder</th><th style="padding:2px 10px">Nr. 2</th><th style="padding:2px 10px">Sidst</th></tr>${rows.replace(/<td>/g,'<td style="padding:2px 10px">')}</table>`;
 }
 function cfgCard(){
@@ -942,7 +954,7 @@ document.addEventListener("click",ev=>{
   else if(a==="noend"){S.confirmEnd=false;render()}
   else if(a==="end"&&r.imported){S.confirmEnd=false;safe(()=>put("rounds/"+r.id,{status:"done"},true),"Runden er afsluttet")}
   else if(a==="end"){
-    const results={};(r.players||[]).forEach(p=>{const t=playerTotals(r,p);results[p]={stb:t.stb,gross:t.gross,toPar:t.toPar,netToPar:t.netToPar,holes:t.thru,ph:t.ph}});
+    const results={};(r.players||[]).forEach(p=>{const t=playerTotals(r,p);results[p]={stb:t.stb,cb:t.cb,hi:t.hi,gross:t.gross,toPar:t.toPar,netToPar:t.netToPar,holes:t.thru,ph:t.ph}});
     S.confirmEnd=false;safe(()=>put("rounds/"+r.id,{status:"done",results},true),"Runden er afsluttet");
   }
   else if(a==="reopen"){safe(()=>put("rounds/"+r.id,{status:"live"},true),"Runden er genåbnet")}
