@@ -95,3 +95,10 @@ exception when duplicate_object then null; end $$;
 
 -- Administrator
 insert into public.admins(pid) values ('kim-holtum') on conflict do nothing;
+
+-- Rettigheder (nyere Supabase giver ikke automatisk adgang til nye tabeller)
+grant select, insert, update, delete on public.docs to authenticated;
+grant select on public.admins to authenticated;
+revoke all on public.docs, public.admins from anon;
+revoke execute on function public.can_write(text,jsonb,text), public.is_admin(), public.my_pid(), public.patch_doc(text,jsonb) from public, anon;
+grant execute on function public.can_write(text,jsonb,text), public.is_admin(), public.my_pid(), public.patch_doc(text,jsonb) to authenticated;
