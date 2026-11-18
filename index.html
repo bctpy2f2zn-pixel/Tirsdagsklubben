@@ -5,9 +5,9 @@
 <meta name="theme-color" content="#0f3b2c">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Tirsdag">
-<link rel="icon" href="icon-180.png?v=3" type="image/png">
-<link rel="apple-touch-icon" href="icon-180.png?v=3">
-<link rel="manifest" href="manifest.webmanifest?v=3">
+<link rel="icon" href="icon-180.png?v=4" type="image/png">
+<link rel="apple-touch-icon" href="icon-180.png?v=4">
+<link rel="manifest" href="manifest.webmanifest?v=4">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
 <title>Tirsdagsklubben</title>
@@ -162,7 +162,7 @@ button.sm{min-height:32px;padding:4px 10px;font-size:13px}
 
 <header class="top">
   <div class="wrap">
-    <div class="brand"><img src="logo.png?v=3" alt="" width="34" height="34" style="display:block"><h1>Tirsdagsklubben</h1><div class="sub" id="sub"></div></div>
+    <div class="brand"><img src="logo.png?v=4" alt="" width="34" height="34" style="display:block"><h1>Tirsdagsklubben</h1><div class="sub" id="sub"></div></div>
     <nav class="tabs" id="tabs">
       <a href="#live">Live</a><a href="#indtast">Indtast</a><a href="#tilmeld">Tilmeld</a><a href="#saeson">Sæson</a><a href="#spillere">Spillere</a><a href="#runde">Runde</a>
     </nav>
@@ -171,7 +171,7 @@ button.sm{min-height:32px;padding:4px 10px;font-size:13px}
 <div id="banner"></div>
 <main class="wrap" id="view"><div class="card empty"><p class="muted">Henter runder…</p></div></main>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-<p class="wrap note" style="text-align:center;padding-block:0 24px">Tirsdagsklubben · web 25</p>
+<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 26</p>
 
 <script>
 /* ---------- Konfiguration (let at justere) ---------- */
@@ -468,11 +468,11 @@ function vAuth(){
       <label class="f">Adgangskode<input id="li-pw" type="password" autocomplete="current-password" placeholder="Din fødselsdato DDMMÅÅ"></label>
       <button class="primary" data-act="login">Log ind</button>
       <p class="note">Første gang du bruger appen, skal du vælge "Første gang".</p>`;
-  return `<div class="card authcard"><h2>Velkommen til Tirsdagsklubben</h2>${tabs}<form id="authform" style="display:grid;gap:10px">${body}</form></div>`;
+  return `<div class="card authcard"><img src="logo.png?v=4" alt="Tirsdagsklubben" width="110" height="110" style="display:block;margin:4px auto 12px"><h2>Velkommen til Tirsdagsklubben</h2>${tabs}<form id="authform" style="display:grid;gap:10px">${body}</form></div>`;
 }
 function vClaim(){
   const free=Object.values(D().players).filter(p=>!p.guest&&!logins()[p.id]).sort((a,b)=>a.name.localeCompare(b.name,"da"));
-  return `<div class="card authcard"><h2>Hvem er du?</h2><p class="muted">Vælg dit navn. Det kan kun gøres én gang, så vælg det rigtige.</p>
+  return `<div class="card authcard"><img src="logo.png?v=4" alt="Tirsdagsklubben" width="110" height="110" style="display:block;margin:4px auto 12px"><h2>Hvem er du?</h2><p class="muted">Vælg dit navn. Det kan kun gøres én gang, så vælg det rigtige.</p>
     <label class="f">Dit navn<select id="cl-pid"><option value="">Vælg dit navn</option>${free.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join("")}</select></label>
     <button class="primary" data-act="claim">Det er mig</button>
     ${free.length?"":`<p class="note">Alle navne er taget. Kontakt administratoren.</p>`}
