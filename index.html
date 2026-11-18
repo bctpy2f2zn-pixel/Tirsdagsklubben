@@ -767,15 +767,7 @@ function cfgHtml(c){
     <table class="small" style="border-collapse:collapse;margin:0 0 10px;text-align:right"><tr style="color:var(--muted)"><th style="text-align:right;padding:2px 10px 2px 0">Deltagere</th><th style="padding:2px 10px">Vinder</th><th style="padding:2px 10px">Nr. 2</th><th style="padding:2px 10px">Sidst</th></tr>${rows.replace(/<td>/g,'<td style="padding:2px 10px">')}</table>`;
 }
 function cfgCard(){
-  const c=seasonCfg();
-  if(!isAdmin()) return `<div class="card"><h3>Pointmodel</h3>${cfgHtml(c)}<p class="small muted" style="margin:0">Kun administratoren kan ændre modellen.</p></div>`;
-  return `<div class="card"><h3>Pointmodel</h3>
-    ${cfgHtml(c)}
-    <div class="row"><label class="f">Model<select id="cfg-mode"><option value="field" ${c.mode==="field"?"selected":""}>Point efter feltets størrelse</option><option value="pct" ${c.mode==="pct"?"selected":""}>Procentpoint (vinder op til 100, sidst det halve)</option><option value="scale" ${c.mode==="scale"?"selected":""}>Fast pointskala</option></select></label>
-    <label class="f" style="flex:1 1 220px;${c.mode==="scale"?"":"display:none"}">Point pr. placering (fast skala)<input id="cfg-scale" value="${c.scale.join(", ")}"></label>
-    <label class="f">Tællende runder<input id="cfg-best" inputmode="numeric" style="width:90px" value="${c.bestOf||""}" placeholder="alle"></label>
-    <label class="f">Finalegange<input id="cfg-mult" inputmode="decimal" style="width:80px" value="${c.finaleMult}"></label>
-    <button data-act="savecfg" style="align-self:end">Gem model</button></div></div>`;
+  return `<div class="card"><h3>Pointmodel</h3>${cfgHtml(seasonCfg())}</div>`;
 }
 
 function vPlayers(){
