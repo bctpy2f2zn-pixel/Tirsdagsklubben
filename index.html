@@ -171,7 +171,7 @@ button.sm{min-height:32px;padding:4px 10px;font-size:13px}
 <div id="banner"></div>
 <main class="wrap" id="view"><div class="card empty"><p class="muted">Henter runder…</p></div></main>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-<p class="wrap note" style="text-align:center;padding-block:0 24px">Tirsdagsklubben · web 22</p>
+<p class="wrap note" style="text-align:center;padding-block:0 24px">Tirsdagsklubben · web 24</p>
 
 <script>
 /* ---------- Konfiguration (let at justere) ---------- */
@@ -287,9 +287,10 @@ function conflictList(r){
 // Procentpoint: vinderen spiller om 40 + 5 pr. deltager (12 eller flere = 100, 8 = 80, 4 = 60). Sidst får det halve; jævnt imellem.
 function pctTop(n){return Math.min(100,40+5*n)}
 function pctPts(k,n){const w=pctTop(n);return n>1?w/2+(w/2)*(n-1-k)/(n-1):w}
+const isGuest=pid=>pid.startsWith("g-")||!!D().players[pid]?.guest;
 function dayPoints(r,cfg){
   // placering efter stableford; delte placeringer deler pointene
-  const res=Object.entries(r.results||{}).filter(([pid,v])=>v.holes>0&&!D().players[pid]?.guest).map(([pid,v])=>({pid,stb:v.stb})).sort((a,b)=>b.stb-a.stb);
+  const res=Object.entries(r.results||{}).filter(([pid,v])=>v.holes>0&&!isGuest(pid)).map(([pid,v])=>({pid,stb:v.stb})).sort((a,b)=>b.stb-a.stb);
   const mult=isFinale(r)?cfg.finaleMult:1,out={};
   for(let i=0;i<res.length;){
     let j=i;while(j<res.length&&res[j].stb===res[i].stb)j++;
@@ -713,7 +714,7 @@ function vSeason(){
     <div class="row" style="margin-bottom:10px"><h2>${esc(per.name)}</h2><span class="spacer"></span><select id="per-sel" aria-label="Vælg sæson">${ps.slice().reverse().map(p=>`<option value="${p.id}" ${p.id===per.id?"selected":""}>${esc(p.name)}</option>`).join("")}</select></div>
     <p class="small muted" style="margin:-4px 0 10px">${per.closed?'<span class="chip">Afsluttet</span> ':""}${esc(fmtDate(per.start))} til ${esc(fmtDate(per.end))}${fin.length?` · finale ${fin.map(d=>esc(fmtDate(d))).join(" og ")}`:""}</p>
     ${rows.length?`<div class="tbl-wrap"><table class="tbl season"><thead><tr><th>Nr.</th><th class="nm">Spiller</th><th class="r">Point</th><th class="r">Runder</th><th class="r">Sejre</th>${head}</tr></thead><tbody>${body}</tbody></table></div>`:`<p class="muted">Ingen afsluttede runder i denne sæson endnu.</p>`}
-    <p class="note">${cfg.mode==="stb"?"Tallene er dagens stableford-point. Markerede felter tæller.":"Stort tal er point, lille tal er dagens stableford."} ${cfgText(cfg)} ${rounds.length} ${rounds.length===1?"tirsdag":"tirsdage"} spillet.</p>
+    <p class="note">${cfg.mode==="stb"?`Tallene er dagens stableford-point. De ${cfg.bestOf} bedste runder (markeret) lægges sammen.`:"Stort tal er point, lille tal er dagens stableford. Markerede felter tæller. Se pointmodellen nedenfor."} ${rounds.length} ${rounds.length===1?"tirsdag":"tirsdage"} spillet.</p>
   </div>`+(per.rules?"":cfgCard());
 }
 function vPlan(){
@@ -741,13 +742,26 @@ function cfgText(c){
     :`Point efter dagens placering: ${c.scale.join(", ")}. Nr. ${c.scale.length} og alle efter får ${c.scale[c.scale.length-1]}.`)
     +` ${c.bestOf>0?`De ${c.bestOf} bedste tirsdage tæller.`:"Alle tirsdage tæller."} Finalerunder giver ${c.finaleMult} gange point. Står flere lige, deler de pointene.`;
 }
+function cfgHtml(c){
+  if(c.mode!=="pct") return `<p class="small muted" style="margin:0 0 10px">${cfgText(c)}</p>`;
+  const f=x=>(Math.round(x*10)/10).toString().replace(".",","), mult=c.finaleMult==2?"dobbelt":c.finaleMult+" gange";
+  const rows=[4,8,12,16].map(n=>`<tr><td>${n}</td><td>${f(pctPts(0,n))}</td><td>${f(pctPts(1,n))}</td><td>${f(pctPts(n-1,n))}</td></tr>`).join("");
+  return `<ol class="small" style="margin:0 0 10px;padding-left:20px;line-height:1.5">
+    <li>Hver tirsdag bliver alle medlemmer placeret efter dagens stableford. Gæster tæller ikke med, hverken i placeringen eller i antallet af deltagere.</li>
+    <li>Vinderen får 40 point plus 5 point for hver deltager, dog højst 100.</li>
+    <li>Sidstepladsen får halvdelen af vinderens point. Alle andre får point med lige store spring imellem.</li>
+    <li>${c.bestOf>0?`Dine ${c.bestOf} bedste tirsdage tæller i sæsonen.`:"Alle tirsdage tæller i sæsonen."}</li>
+    <li>De to finaler giver ${mult} point.</li>
+    <li>Står flere lige, deler de pointene.</li></ol>
+    <table class="small" style="border-collapse:collapse;margin:0 0 10px;text-align:right"><tr style="color:var(--muted)"><th style="text-align:right;padding:2px 10px 2px 0">Deltagere</th><th style="padding:2px 10px">Vinder</th><th style="padding:2px 10px">Nr. 2</th><th style="padding:2px 10px">Sidst</th></tr>${rows.replace(/<td>/g,'<td style="padding:2px 10px">')}</table>`;
+}
 function cfgCard(){
   const c=seasonCfg();
-  if(!isAdmin()) return `<div class="card"><h3>Pointmodel</h3><p class="small muted" style="margin:0">${cfgText(c)} Kun administratoren kan ændre modellen.</p></div>`;
+  if(!isAdmin()) return `<div class="card"><h3>Pointmodel</h3>${cfgHtml(c)}<p class="small muted" style="margin:0">Kun administratoren kan ændre modellen.</p></div>`;
   return `<div class="card"><h3>Pointmodel</h3>
-    <p class="small muted" style="margin:0 0 10px">${cfgText(c)}</p>
+    ${cfgHtml(c)}
     <div class="row"><label class="f">Model<select id="cfg-mode"><option value="field" ${c.mode==="field"?"selected":""}>Point efter feltets størrelse</option><option value="pct" ${c.mode==="pct"?"selected":""}>Procentpoint (vinder op til 100, sidst det halve)</option><option value="scale" ${c.mode==="scale"?"selected":""}>Fast pointskala</option></select></label>
-    <label class="f" style="flex:1 1 220px">Point pr. placering (fast skala)<input id="cfg-scale" value="${c.scale.join(", ")}"></label>
+    <label class="f" style="flex:1 1 220px;${c.mode==="scale"?"":"display:none"}">Point pr. placering (fast skala)<input id="cfg-scale" value="${c.scale.join(", ")}"></label>
     <label class="f">Tællende runder<input id="cfg-best" inputmode="numeric" style="width:90px" value="${c.bestOf||""}" placeholder="alle"></label>
     <label class="f">Finalegange<input id="cfg-mult" inputmode="decimal" style="width:80px" value="${c.finaleMult}"></label>
     <button data-act="savecfg" style="align-self:end">Gem model</button></div></div>`;
@@ -934,6 +948,7 @@ document.addEventListener("click",ev=>{
   else if(a==="reopen"){safe(()=>put("rounds/"+r.id,{status:"live"},true),"Runden er genåbnet")}
 });
 document.addEventListener("change",ev=>{
+  if(ev.target.id==="cfg-mode"){const l=$("#cfg-scale")?.closest("label");if(l)l.style.display=ev.target.value==="scale"?"":"none"}
   const el=ev.target;
   if(el.id==="me-sel"){if(!el.value)return;if(S.demo)S.meDemo=el.value;else{S.me=el.value;lsSet("tg-me",el.value)}S.hole=1;render()}
   else if(el.id==="act-sel"){if(!isAdmin())return;if(S.demo)S.meDemo=el.value;else S.me=el.value;S.hole=1;render()}
