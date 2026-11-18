@@ -289,13 +289,12 @@ function conflictList(r){
 function pctTop(n){return Math.min(100,40+5*n)}
 function pctPts(k,n){const w=pctTop(n);return n>1?w/2+(w/2)*(n-1-k)/(n-1):w}
 const isGuest=pid=>pid.startsWith("g-")||!!D().players[pid]?.guest;
-// Lige stableford afgøres på de sidste 9, 6, 3 og 1 hul (stableford), derefter laveste handicap.
+// Lige stableford afgøres på de sidste 9, 6, 3 og 1 hul (stableford); derefter uafgjort.
 // Importerede runder (2026) har ikke huldata; der deler man stadig.
 function dayCmp(a,b){
   if(b.stb!==a.stb) return b.stb-a.stb;
   if(!a.cb||!b.cb) return 0;
   for(let k=0;k<4;k++) if(b.cb[k]!==a.cb[k]) return b.cb[k]-a.cb[k];
-  if(a.hi!=null&&b.hi!=null&&a.hi!==b.hi) return a.hi-b.hi;
   return 0;
 }
 function dayPoints(r,cfg){
@@ -763,8 +762,8 @@ function cfgHtml(c){
     <li>Sidstepladsen får halvdelen af vinderens point. Alle andre får point med lige store spring imellem.</li>
     <li>${c.bestOf>0?`Dine ${c.bestOf} bedste tirsdage tæller i sæsonen.`:"Alle tirsdage tæller i sæsonen."}</li>
     <li>De to finaler giver ${mult} point.</li>
-    <li>Lige stilling på en tirsdag: den med flest stablefordpoint på de sidste 9 huller vinder. Er de stadig lige, ser vi på de sidste 6, 3 og til sidst det 18. hul. Er de stadig lige, vinder den med lavest handicap.</li>
-    <li>Lige stilling i sæsonen: først tæller flest vundne tirsdage, så flest point i de to finaler og så det højeste pointtal på én tirsdag. Er de stadig lige, trækker administratoren lod.</li></ol>
+    <li>Lige stilling på en tirsdag: den med flest stablefordpoint på de sidste 9 huller vinder. Er de stadig lige, ser vi på de sidste 6, de sidste 3 og til sidst det sidste hul. Er de stadig lige, er det uafgjort, og de deler pointene.</li>
+    <li>Lige stilling i sæsonen: først tæller flest vundne tirsdage, så flest point i de to finaler og så det højeste pointtal på én tirsdag. Er de stadig lige, deler de pladsen.</li></ol>
     <table class="small" style="border-collapse:collapse;margin:0 0 10px;text-align:right"><tr style="color:var(--muted)"><th style="text-align:right;padding:2px 10px 2px 0">Deltagere</th><th style="padding:2px 10px">Vinder</th><th style="padding:2px 10px">Nr. 2</th><th style="padding:2px 10px">Sidst</th></tr>${rows.replace(/<td>/g,'<td style="padding:2px 10px">')}</table>`;
 }
 function cfgCard(){
