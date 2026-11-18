@@ -745,7 +745,7 @@ function cfgText(c){
 function cfgHtml(c){
   if(c.mode!=="pct") return `<p class="small muted" style="margin:0 0 10px">${cfgText(c)}</p>`;
   const f=x=>(Math.round(x*10)/10).toString().replace(".",","), mult=c.finaleMult==2?"dobbelt":c.finaleMult+" gange";
-  const rows=[4,8,12,16].map(n=>`<tr><td>${n}</td><td>${f(pctPts(0,n))}</td><td>${f(pctPts(1,n))}</td><td>${f(pctPts(n-1,n))}</td></tr>`).join("");
+  const rows=[4,5,6,7,8,9,10,11,12].map(n=>`<tr><td>${n===12?"12+":n}</td><td>${f(pctPts(0,n))}</td><td>${f(pctPts(1,n))}</td><td>${f(pctPts(n-1,n))}</td></tr>`).join("");
   return `<ol class="small" style="margin:0 0 10px;padding-left:20px;line-height:1.5">
     <li>Hver tirsdag bliver alle medlemmer placeret efter dagens stableford. Gæster tæller ikke med, hverken i placeringen eller i antallet af deltagere.</li>
     <li>Vinderen får 40 point plus 5 point for hver deltager, dog højst 100.</li>
