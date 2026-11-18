@@ -1,0 +1,1031 @@
+<!doctype html>
+<html lang="da"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f3b2c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Tirsdag">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<title>Tirsdagsklubben</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&display=swap">
+</head><body>
+<style>
+html,body{margin:0}
+/* Layout: sticky green "scoreboard" header with tabs, one narrow column of operable cards, phone first */
+:root{
+  --bg:#eef2ee; --surface:#ffffff; --ink:#14201a; --muted:#5b6a62; --line:#d9e1db;
+  --board:#0f3b2c; --board-2:#16503c; --board-ink:#f3f0e2; --flag:#e9b93a;
+  --under:#c41d2c; --warn:#c41d2c; --warn-bg:#fde9ea; --ok:#1f7a4d; --soft:#f5f8f5;
+  --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0c1411; --surface:#141f1a; --ink:#e6ece8; --muted:#93a39a; --line:#25342d;
+  --board:#0a2a1f; --board-2:#123d2e; --board-ink:#f3f0e2; --flag:#e9b93a;
+  --under:#ff6b72; --warn:#ff7a80; --warn-bg:#3a1619; --ok:#5fcf95; --soft:#18251f; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0c1411; --surface:#141f1a; --ink:#e6ece8; --muted:#93a39a; --line:#25342d;
+  --board:#0a2a1f; --board-2:#123d2e; --board-ink:#f3f0e2; --flag:#e9b93a;
+  --under:#ff6b72; --warn:#ff7a80; --warn-bg:#3a1619; --ok:#5fcf95; --soft:#18251f; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--board)}
+.wrap{max-width:720px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--board);color:var(--board-ink)}
+.brand{display:flex;align-items:center;gap:10px;padding-block:12px 6px}
+.brand h1{font-family:var(--display);font-weight:700;font-size:24px;letter-spacing:.02em;margin:0;text-transform:uppercase}
+.brand .flag{width:10px;height:22px;position:relative}
+.brand .flag::before{content:"";position:absolute;left:0;top:0;width:2px;height:22px;background:var(--board-ink)}
+.brand .flag::after{content:"";position:absolute;left:2px;top:1px;border-left:9px solid var(--flag);border-top:5px solid transparent;border-bottom:5px solid transparent}
+.brand .sub{margin-left:auto;font-size:12px;opacity:.8;text-align:right}
+nav.tabs{display:flex;gap:2px;overflow-x:auto;padding-bottom:0}
+nav.tabs a{flex:1 1 0;min-width:0;text-align:center;color:var(--board-ink);opacity:.7;text-decoration:none;font-family:var(--display);font-weight:600;font-size:clamp(13px,3.6vw,16px);letter-spacing:.03em;text-transform:uppercase;padding:8px 2px 10px;white-space:nowrap;border-bottom:3px solid transparent}
+nav.tabs a[aria-current="page"]{opacity:1;border-bottom-color:var(--flag)}
+nav.tabs a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--flag);outline-offset:2px}
+main{padding-block:16px 48px;display:grid;gap:14px}
+.banner{background:var(--flag);color:#1d1606;font-size:13px;padding-block:8px}
+.banner .wrap{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.banner button{margin-left:auto}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;min-width:0}
+h2{font-family:var(--display);font-weight:700;font-size:22px;letter-spacing:.02em;text-transform:uppercase;margin:0;text-wrap:balance}
+h3{font-family:var(--display);font-weight:600;font-size:17px;letter-spacing:.04em;text-transform:uppercase;margin:0 0 8px}
+.muted{color:var(--muted)} .small{font-size:13px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.spacer{flex:1}
+button,.btn{font:inherit;font-weight:600;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:8px 14px;cursor:pointer;min-height:40px}
+button.primary{background:var(--board);color:var(--board-ink);border-color:var(--board)}
+button.danger{background:var(--warn);color:#fff;border-color:var(--warn)}
+button.ghost{background:transparent}
+button:disabled{opacity:.5;cursor:default}
+input,select{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:40px}
+label.f{display:grid;gap:4px;font-size:13px;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;border-radius:0;min-height:36px;padding:6px 12px;font-size:14px}
+.seg button[aria-pressed="true"]{background:var(--board);color:var(--board-ink)}
+.live-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--under);margin-right:6px;animation:pulse 1.6s infinite}
+@keyframes pulse{50%{opacity:.25}}
+@media (prefers-reduced-motion:reduce){.live-dot{animation:none}}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;padding:2px 8px;border-radius:99px;background:var(--soft);border:1px solid var(--line)}
+.chip.warn{background:var(--warn-bg);color:var(--warn);border-color:var(--warn)}
+/* leaderboard */
+.lb{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;table-layout:fixed}
+.lb .name{overflow-wrap:anywhere}
+.lb td.card-cell .sc-wrap{max-width:100%}
+.lb th{font-family:var(--display);font-weight:600;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-align:left;padding:6px 6px;border-bottom:2px solid var(--ink)}
+.lb td{padding:10px 6px;border-bottom:1px solid var(--line);vertical-align:middle}
+.lb tr.p{cursor:pointer}
+.lb tr.p:hover td{background:var(--soft)}
+.lb .pos{width:44px;font-family:var(--display);font-weight:700;font-size:18px}
+.lb .num{text-align:right;width:60px}
+.lb .tot{font-family:var(--display);font-weight:700;font-size:22px}
+.lb .tot.u{color:var(--under)}
+.lb .name{font-weight:600}
+.lb .name small{display:block;font-weight:400;color:var(--muted);font-size:12px}
+.lb tr.conf td{background:var(--warn-bg)}
+.lb td.card-cell{padding:0 0 12px;background:var(--soft)}
+.sc-wrap{overflow-x:auto;padding:8px}
+.sc{border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:13px}
+.sc th,.sc td{width:30px;min-width:30px;height:30px;text-align:center;padding:0;border:1px solid var(--line)}
+.sc th{font-weight:600;color:var(--muted);font-size:11px}
+.sc td.lbl{width:auto;min-width:46px;text-align:left;padding:0 6px;color:var(--muted);font-weight:600}
+.sc .s{display:inline-flex;width:24px;height:24px;align-items:center;justify-content:center;font-weight:600}
+.sc .birdie{border:1.5px solid var(--under);border-radius:50%;color:var(--under)}
+.sc .eagle{border:1.5px solid var(--under);border-radius:50%;box-shadow:0 0 0 2px var(--surface),0 0 0 3.5px var(--under);color:var(--under)}
+.sc .bogey{border:1.5px solid var(--ink)}
+.sc .dbl{border:1.5px solid var(--ink);box-shadow:0 0 0 2px var(--surface),0 0 0 3.5px var(--ink)}
+.sc td.c{background:var(--warn-bg);color:var(--warn);font-weight:700}
+.sc td.one{opacity:.6}
+.alert{background:var(--warn-bg);border:1px solid var(--warn);color:var(--warn);border-radius:10px;padding:10px 14px;font-weight:500}
+.alert ul{margin:4px 0 0;padding-left:18px}
+.alert button{color:var(--warn);border-color:var(--warn);background:transparent;min-height:30px;padding:2px 8px;font-size:13px}
+/* entry */
+.holehead{display:flex;align-items:center;gap:12px}
+.holehead .big{font-family:var(--display);font-weight:700;font-size:44px;line-height:1}
+.holehead .meta{font-size:13px;color:var(--muted)}
+.strip{display:grid;grid-template-columns:repeat(9,1fr);gap:4px;margin-top:12px}
+.strip button{min-height:32px;padding:0;font-size:13px;border-radius:6px;font-variant-numeric:tabular-nums}
+.strip button.done{background:var(--soft);color:var(--ok);border-color:var(--ok)}
+.strip button.c{background:var(--warn-bg);color:var(--warn);border-color:var(--warn)}
+.strip button.cur{outline:2px solid var(--flag);outline-offset:1px}
+.pl{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+.pl:first-of-type{border-top:0}
+.pl .who{font-weight:600;min-width:0}
+.pl .who small{display:block;font-weight:400;color:var(--muted);font-size:12px}
+.dots{color:var(--ok);letter-spacing:2px}
+.step{display:flex;align-items:center;gap:6px}
+.step button{width:48px;height:48px;font-size:24px;padding:0;border-radius:50%}
+.step .val{width:52px;height:52px;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:700;font-size:30px;border-radius:10px;border:2px solid var(--line);background:var(--soft);cursor:pointer}
+.pl.c .val{border-color:var(--warn);color:var(--warn);background:var(--warn-bg)}
+.pl .mm{grid-column:1/-1;font-size:13px;color:var(--warn);font-weight:600}
+/* tables */
+.tbl-wrap{overflow-x:auto}
+.tbl{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.tbl th{font-family:var(--display);font-weight:600;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-align:left;padding:6px;border-bottom:2px solid var(--ink)}
+.tbl td{padding:9px 6px;border-bottom:1px solid var(--line)}
+.tbl .r{text-align:right}
+.games{display:inline-flex;gap:2px;vertical-align:middle;flex-wrap:wrap;max-width:140px}
+.games i{width:7px;height:12px;border-radius:2px;background:var(--board-2)}
+.games i.o{background:var(--line)}
+.season th.d,.season td.d{text-align:center;min-width:38px;padding:6px 3px}
+.season th.d small{display:block;font-size:10px;letter-spacing:.04em;font-family:var(--body);font-weight:500}
+.season td.d{color:var(--muted);line-height:1.1}
+.season td.d small{display:block;font-size:10px;font-weight:400;color:var(--muted)}
+.season td.d.cnt{background:var(--soft);color:var(--ink);font-weight:700;box-shadow:inset 0 -2px 0 var(--flag)}
+.season .nm{position:sticky;left:0;background:var(--surface);white-space:nowrap;z-index:1}
+.season .pos{font-family:var(--display);font-weight:700;font-size:17px;width:36px}
+.season .big{font-family:var(--display);font-weight:700;font-size:20px}
+.authcard{display:grid;gap:12px;max-width:440px;margin:0 auto;width:100%}
+.whobar{gap:8px;padding:2px 0}
+button.sm{min-height:32px;padding:4px 10px;font-size:13px}
+.signlist{margin:10px 0;padding-left:22px;display:grid;gap:2px}
+.signlist li span{flex:1}
+.signlist li{padding:4px 0;border-bottom:1px solid var(--line);min-height:40px;line-height:32px}
+.signlist li button{float:right;margin-left:6px}
+.signlist li::marker{color:var(--muted);font-variant-numeric:tabular-nums}
+.signlist li > span + button{margin-left:6px}
+.flights{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.flight{border:1px solid var(--line);border-radius:8px;padding:10px;background:var(--soft)}
+.chk{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
+.chk label{display:flex;gap:8px;align-items:center;padding:6px 8px;border:1px solid var(--line);border-radius:8px;cursor:pointer}
+.empty{text-align:center;padding:28px 14px}
+.empty p{max-width:46ch;margin:6px auto 14px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);top:calc(110px + env(safe-area-inset-top,0px));background:var(--ok);color:#fff;padding:14px 18px;border-radius:10px;font-size:16px;font-weight:600;z-index:20;width:min(92vw,520px);box-shadow:0 6px 24px rgba(0,0,0,.35);cursor:pointer}
+.toast.err{background:var(--warn)}
+.toast small{display:block;font-weight:400;font-size:13px;opacity:.9;margin-top:2px}
+.note{font-size:13px;color:var(--muted)}
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand"><span class="flag" aria-hidden="true"></span><h1>Tirsdagsklubben</h1><div class="sub" id="sub"></div></div>
+    <nav class="tabs" id="tabs">
+      <a href="#live">Live</a><a href="#indtast">Indtast</a><a href="#tilmeld">Tilmeld</a><a href="#saeson">Sæson</a><a href="#spillere">Spillere</a><a href="#runde">Runde</a>
+    </nav>
+  </div>
+</header>
+<div id="banner"></div>
+<main class="wrap" id="view"><div class="card empty"><p class="muted">Henter runder…</p></div></main>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+<p class="wrap note" style="text-align:center;padding-block:0 24px">Tirsdagsklubben · web 22</p>
+
+<script>
+/* ---------- Konfiguration (let at justere) ---------- */
+// Banedata er FORELØBIGE pladsholdere. Ret par, index, CR og slope til de rigtige tal fra scorekortet.
+// CR/slope pr. tee: herrer, fra The Scandinavians sloperegistrering. Par/index pr. hul fra scorekortene (Kim, 18/11-2026).
+const COURSES_DEFAULT = {
+  old:{name:"Old Course", provisional:false, defaultTee:"56",
+    tees:{"46":{cr:67.3,slope:128},"50":{cr:69.4,slope:129},"52":{cr:70.2,slope:135},"56":{cr:72.6,slope:141},"59":{cr:74.2,slope:145},"63":{cr:76.2,slope:150}},
+    par:[4,5,4,4,3,4,4,3,5, 5,4,3,4,3,4,3,5,5],
+    si: [11,5,13,1,15,9,3,17,7, 8,2,16,6,14,12,18,4,10]},
+  new:{name:"New Course", provisional:false, defaultTee:"57",
+    tees:{"46":{cr:67.4,slope:128},"50":{cr:69.3,slope:129},"53":{cr:70.7,slope:136},"57":{cr:73.2,slope:142},"60":{cr:74.8,slope:146},"64":{cr:76.3,slope:151}},
+    par:[5,3,4,5,3,4,5,4,3, 4,4,5,3,4,4,4,3,5],
+    si: [5,17,9,3,15,1,7,11,13, 4,8,2,18,12,14,10,16,6]}
+};
+// Bane + tee for en runde (CR og slope fra den valgte tee)
+const teeOf=(r,pid)=>r.tees?.[pid]||D().players[pid]?.tee?.[r.course]||r.tee||course(r.course).defaultTee;
+function courseR(id,tee){const c=course(id);const t=c.tees?.[tee||c.defaultTee]||{};return {...c,...t,tee:tee||c.defaultTee}}
+// Sæsonstilling: hver tirsdag rangeres efter stableford, og placeringen giver point.
+// Standardværdier; kan ændres i appen under Sæson (gemmes i config/season).
+// mode "field": point = antal deltagere minus placering + 1 (vinderen af 20 får 20, sidst får 1), så puljen vokser med feltet.
+// mode "scale": fast skala efter placering.
+const SEASON_DEFAULT = {mode:"pct", scale:[20,17,15,13,12,11,10,9,8,7,6,5,4,3,2,1], bestOf:4, finaleMult:2};
+const MATCH = {stb:"Stableford",gross:"Slagspil brutto",net:"Slagspil netto"};
+
+/* ---------- Hjælpere ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const sum = a => a.reduce((x,y)=>x+y,0);
+const clone = o => JSON.parse(JSON.stringify(o ?? null));
+function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
+function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+// Beskeder vises øverst. Fejl bliver stående, til man trykker på dem; bekræftelser forsvinder efter 5 sekunder.
+function toast(msg,kind){const t=$("#toast");const err=kind==="err"||(kind!=="ok"&&/^(Kunne ikke|Du har ikke|Du kan kun|Det kan kun|Der er ingen|Gæster kan|Skriv|Vælg|Udfyld|For mange|Forkert|Den |De to|DGU|Fødsels|Handicap|Navnet|Scoren)/.test(msg));
+  t.className="toast"+(err?" err":"");t.innerHTML=esc(msg)+(err?"<small>Tryk for at lukke</small>":"");t.hidden=false;clearTimeout(toast.t);if(!err)toast.t=setTimeout(()=>t.hidden=true,5000)}
+document.addEventListener("click",ev=>{if(ev.target.closest("#toast"))$("#toast").hidden=true});
+function fmtPar(n){return n===0?"E":(n>0?"+"+n:String(n))}
+function fmtDate(iso){try{return new Date(iso.slice(0,10)+"T12:00:00").toLocaleDateString("da-DK",{weekday:"long",day:"numeric",month:"long"})}catch(e){return iso}}
+function localIso(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+function nextTuesday(){const d=new Date();d.setDate(d.getDate()+((2-d.getDay()+7)%7));return localIso(d)}
+/* sæsoner (config/periods) og baneplan (config/schedule) */
+function defaultPeriods(){
+  const ys=new Set(Object.keys(D().rounds).map(k=>k.slice(0,4)));ys.add(String(new Date().getFullYear()));ys.add(String(new Date().getFullYear()+1));
+  return [...ys].flatMap(y=>[{id:"f"+y,name:"Forår "+y,start:y+"-04-01",end:y+"-06-30",finales:2},{id:"e"+y,name:"Efterår "+y,start:y+"-08-01",end:y+"-12-15",finales:2}]);
+}
+const periods=()=>((D().config?.periods?.list)||defaultPeriods()).slice().sort((a,b)=>a.start.localeCompare(b.start));
+const periodOf=iso=>periods().find(p=>iso.slice(0,10)>=p.start&&iso.slice(0,10)<=p.end);
+function tuesdaysIn(p){const out=[];const d=new Date(p.start+"T12:00:00");d.setDate(d.getDate()+((2-d.getDay()+7)%7));while(localIso(d)<=p.end){out.push(localIso(d));d.setDate(d.getDate()+7)}return out}
+function isFinale(r){const p=periodOf(r.id);const n=Number(p?.finales??2);if(!p||n<=0)return false;return tuesdaysIn(p).slice(-n).includes(r.id.slice(0,10))}
+const courseFor=day=>D().config?.schedule?.dates?.[day]||null;
+function newId(){return Math.random().toString(36).slice(2,10)}
+
+/* ---------- Tilstand ---------- */
+const LIVE = {players:{},courses:{},rounds:{},entries:{},config:{},signups:{},logins:{}};
+let DEMO = null;
+const S = {mode:"loading", demo:false, db:null, view:"live", board:"stb", open:null, hole:1,
+  me:lsGet("tg-me"), period:null, planOpen:null, draft:null, confirmEnd:false, stale:false};
+const D = () => S.demo ? DEMO : LIVE;
+const course = id => ({...(COURSES_DEFAULT[id]||COURSES_DEFAULT.old), ...(D().courses[id]||{})});
+const seasonCfg = () => ({...SEASON_DEFAULT, ...(D().config?.season||{})});
+const pname = id => D().players[id]?.name || "Ukendt spiller";
+
+function currentRound(){
+  const rs=Object.values(D().rounds).sort((a,b)=>(b.id||"").localeCompare(a.id||""));
+  return rs.find(r=>r.status==="live") || rs[0] || null;
+}
+
+/* ---------- Beregning ---------- */
+function strokesOn(ph,si){
+  if(ph>=0) return Math.floor(ph/18)+(si<=ph%18?1:0);
+  const p=-ph; return -(Math.floor(p/18)+(si>18-p%18?1:0));
+}
+function playingHcp(hi,c){return Math.round(hi*c.slope/113+(c.cr-sum(c.par)))}
+function holeVals(r,pid){
+  const fl=r.flights?.[pid];
+  const es=Object.values(D().entries[r.id]||{}).filter(e=>e.flight===fl && e.scores && e.scores[pid]);
+  return Array.from({length:18},(_,h)=>{
+    const vals=es.map(e=>({by:e.by,v:e.scores[pid][h]})).filter(x=>x.v>0);
+    if(!vals.length) return {st:"none",vals};
+    const same=vals.every(x=>x.v===vals[0].v);
+    return same?{st:vals.length>1?"ok":"one",v:vals[0].v,vals}:{st:"conflict",vals};
+  });
+}
+function calc(c,hi,hv){
+  const ph=playingHcp(hi,c);
+  let thru=0,gross=0,par=0,stb=0,net=0,conflicts=0,unconf=0;
+  hv.forEach((x,h)=>{
+    if(x.st==="conflict"){conflicts++;return}
+    if(x.st==="none") return;
+    const s=strokesOn(ph,c.si[h]);
+    thru++;gross+=x.v;par+=c.par[h];net+=x.v-s;stb+=Math.max(0,c.par[h]+s-x.v+2);
+    if(x.st==="one") unconf++;
+  });
+  return {hi,ph,hv,thru,gross,par,toPar:gross-par,netToPar:net-par,stb,conflicts,unconf};
+}
+function playerTotals(r,pid){
+  const hi=(r.hcp&&r.hcp[pid]!=null)?r.hcp[pid]:(D().players[pid]?.hi??0);
+  return {pid,...calc(courseR(r.course,teeOf(r,pid)),hi,holeVals(r,pid))};
+}
+function ranked(list,key,dir){
+  const played=list.filter(t=>t.thru>0), rest=list.filter(t=>t.thru===0);
+  played.sort((a,b)=>dir*(a[key]-b[key]) || b.thru-a.thru);
+  let pos=0;played.forEach((t,i)=>{if(i===0||t[key]!==played[i-1][key])pos=i+1;t.pos=pos});
+  played.forEach(t=>{t.tie=played.filter(o=>o.pos===t.pos).length>1});
+  rest.forEach(t=>t.pos=null);
+  return played.concat(rest.sort((a,b)=>pname(a.pid).localeCompare(pname(b.pid))));
+}
+function conflictList(r){
+  const out=[];
+  (r.players||[]).forEach(pid=>holeVals(r,pid).forEach((x,h)=>{if(x.st==="conflict")out.push({pid,h,vals:x.vals})}));
+  return out;
+}
+// Procentpoint: vinderen spiller om 40 + 5 pr. deltager (12 eller flere = 100, 8 = 80, 4 = 60). Sidst får det halve; jævnt imellem.
+function pctTop(n){return Math.min(100,40+5*n)}
+function pctPts(k,n){const w=pctTop(n);return n>1?w/2+(w/2)*(n-1-k)/(n-1):w}
+function dayPoints(r,cfg){
+  // placering efter stableford; delte placeringer deler pointene
+  const res=Object.entries(r.results||{}).filter(([pid,v])=>v.holes>0&&!D().players[pid]?.guest).map(([pid,v])=>({pid,stb:v.stb})).sort((a,b)=>b.stb-a.stb);
+  const mult=isFinale(r)?cfg.finaleMult:1,out={};
+  for(let i=0;i<res.length;){
+    let j=i;while(j<res.length&&res[j].stb===res[i].stb)j++;
+    let t=0;for(let k=i;k<j;k++)t+=cfg.mode==="stb"?res[k].stb:cfg.mode==="pct"?pctPts(k,res.length):cfg.mode==="field"?res.length-k:(cfg.scale[k]??cfg.scale[cfg.scale.length-1]??0);
+    for(let k=i;k<j;k++)out[res[k].pid]={pts:Math.round(mult*t/(j-i)*10)/10,pos:i+1,tie:j-i>1,stb:res[k].stb};
+    i=j;
+  }
+  return out;
+}
+// En sæson kan have sine egne regler (per.rules), fx 2026: summen af de 4 bedste stableford-runder.
+function seasonTable(per){
+  const cfg={...seasonCfg(),...(per.rules||{})};
+  const rounds=Object.values(D().rounds).filter(r=>r.status==="done"&&r.results&&r.counts!==false&&r.id.slice(0,10)>=per.start&&r.id.slice(0,10)<=per.end).sort((a,b)=>a.id.localeCompare(b.id));
+  const agg={};
+  rounds.forEach(r=>Object.entries(dayPoints(r,cfg)).forEach(([pid,v])=>{
+    if(D().players[pid]?.guest) return;
+    const a=agg[pid]||(agg[pid]={pid,cells:{},list:[],wins:0});
+    a.cells[r.id]=v;a.list.push({rid:r.id,pts:v.pts});if(v.pos===1)a.wins++;
+  }));
+  const rows=Object.values(agg).map(a=>{
+    const sorted=a.list.slice().sort((x,y)=>y.pts-x.pts||x.rid.localeCompare(y.rid));
+    const best=cfg.bestOf>0?sorted.slice(0,cfg.bestOf):sorted;
+    return {...a,n:a.list.length,total:Math.round(sum(best.map(x=>x.pts))*10)/10,counting:new Set(best.map(x=>x.rid))};
+  });
+  rows.sort((a,b)=>b.total-a.total||b.wins-a.wins||b.n-a.n||pname(a.pid).localeCompare(pname(b.pid),"da"));
+  let pos=0;rows.forEach((r,i)=>{if(i===0||r.total!==rows[i-1].total)pos=i+1;r.pos=pos});
+  return {rows,rounds,cfg};
+}
+
+/* ---------- Skrivning (db eller demo) ---------- */
+function deepMerge(a,b){const o={...a};for(const k in b){o[k]=(b[k]&&typeof b[k]==="object"&&!Array.isArray(b[k])&&a&&typeof a[k]==="object"&&!Array.isArray(a[k]))?deepMerge(a[k],b[k]):b[k]}return o}
+async function del(path){
+  if(S.demo){const seg=path.split("/");delete DEMO.signups?.[seg[1]]?.[seg[3]];render();return}
+  return S.db.doc(path).delete();
+}
+async function put(path,data,merge){
+  if(S.demo){
+    const seg=path.split("/"),id=seg[seg.length-1];let tgt;
+    if(seg[0]==="players") tgt=DEMO.players;
+    else if(seg[0]==="config") tgt=DEMO.config||(DEMO.config={});
+    else if(seg[0]==="logins") tgt=DEMO.logins||(DEMO.logins={});
+    else if(seg.length===2) tgt=DEMO.rounds;
+    else if(seg[0]==="signups") tgt=(DEMO.signups||(DEMO.signups={}))[seg[1]]||(DEMO.signups[seg[1]]={});
+    else tgt=DEMO.entries[seg[1]]||(DEMO.entries[seg[1]]={});
+    tgt[id]=merge?deepMerge(tgt[id]||{},data):{...clone(data),id};
+    render();return;
+  }
+  if(!S.db) throw {message:"Ingen forbindelse til databasen"};
+  const ref=S.db.doc(path);
+  return merge?ref.update(data):ref.set(data);
+}
+async function safe(fn,okMsg){
+  try{if(S.demo)throw {message:"appen er ikke forbundet til databasen, så intet bliver gemt"};await fn();if(okMsg)toast(okMsg,"ok")}
+  catch(e){toast(e?.code==="invalid_argument"?"Du har ikke adgang til at gemme her.":"Kunne ikke gemme: "+(e?.message||"ukendt fejl"),"err")}
+}
+
+/* score-indtastning: gem efter kort pause, én skrivning ad gangen */
+let pend=null,saving=false,saveTimer=null;
+function queueSave(rid,me,entry){pend={rid,me,entry};clearTimeout(saveTimer);saveTimer=setTimeout(flush,500)}
+async function flush(){
+  if(saving||!pend) return;
+  const p=pend;pend=null;
+  if(S.demo) return;
+  saving=true;
+  try{await S.db.doc(`rounds/${p.rid}/entries/${p.me}`).set(p.entry)}
+  catch(e){toast("Scoren blev ikke gemt. Tjek forbindelsen og tast igen.")}
+  saving=false;if(pend)flush();
+}
+
+/* ---------- Live-abonnementer ---------- */
+let unsubEntries=null,entriesRid=null,loadTimer=null;
+const signupSubs={};
+function ensureSignupSubs(){
+  if(!S.db||!S.periodsLoaded)return;
+  openTuesdays().forEach(day=>{if(signupSubs[day])return;signupSubs[day]=S.db.collection(`signups/${day}/entries`).onSnapshot(snap=>{
+    const m={};snap.docs.forEach(d=>m[d.id]={...d.data(),id:d.id});LIVE.signups[day]=m;render();
+  },()=>{})});
+}
+function subscribe(){
+  const db=S.db;
+  ensureSignupSubs();
+  loadTimer=setTimeout(()=>{S.stale=true;render()},10000);
+  const fail=e=>{clearTimeout(loadTimer);S.stale=true;render()};
+  db.collection("players").onSnapshot(snap=>{
+    LIVE.players={};snap.docs.forEach(d=>LIVE.players[d.id]={...d.data(),id:d.id});render();
+  },fail);
+  db.collection("logins").onSnapshot(snap=>{
+    LIVE.logins={};snap.docs.forEach(d=>LIVE.logins[d.id]=d.data());S.loginsLoaded=true;render();
+  },fail);
+  db.collection("config").onSnapshot(snap=>{
+    LIVE.config={};snap.docs.forEach(d=>LIVE.config[d.id]=d.data());S.periodsLoaded=true;ensureSignupSubs();render();
+  },fail);
+  db.collection("courses").onSnapshot(snap=>{
+    LIVE.courses={};snap.docs.forEach(d=>LIVE.courses[d.id]=d.data());render();
+  },fail);
+  db.collection("rounds").onSnapshot(snap=>{
+    if(!snap.metadata.fromCache){clearTimeout(loadTimer);S.stale=false}
+    LIVE.rounds={};snap.docs.forEach(d=>LIVE.rounds[d.id]={...d.data(),id:d.id});
+    S.mode="live";
+    const r=Object.values(LIVE.rounds).sort((a,b)=>b.id.localeCompare(a.id));
+    const cur=(r.find(x=>x.status==="live")||r[0]||{}).id||null;
+    if(cur!==entriesRid){
+      if(unsubEntries)unsubEntries();unsubEntries=null;entriesRid=cur;
+      if(cur) unsubEntries=db.collection(`rounds/${cur}/entries`).onSnapshot(es=>{
+        const m={};es.docs.forEach(d=>m[d.id]=d.data());
+        if(pend&&pend.rid===cur) m[pend.me]=pend.entry; // behold egne, ikke-gemte tal
+        LIVE.entries[cur]=m;render();
+      },fail);
+    }
+    render();
+  },fail);
+}
+
+/* ---------- Demo ---------- */
+function rng(seed){return()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+// Jeres resultater fra forår og efterår 2026 (fra regnearkene). Vises kun, hvis den fælles database ikke kan nås.
+const SNAPSHOT={"players":{},"rounds":{},"config":{}};
+function buildDemo(){const d=clone(SNAPSHOT);d.courses={};d.entries={};d.signups={};return d}
+function startDemo(){DEMO=buildDemo();S.demo=true;S.open=null;S.draft=null;S.meDemo=S.me&&DEMO.players[S.me]?S.me:null;render()}
+function stopDemo(){S.demo=false;S.open=null;S.draft=null;render()}
+const myId=()=>{const m=S.demo?S.meDemo:S.me;return m&&D().players[m]?m:null};
+// Administrator: artefaktens ejer, eller en spiller markeret admin:true (fx Kim Holtum)
+// UI-lås; databasen tjekker selv (tabellen admins), så ingen kan snyde sig til at være administrator.
+const canAdmin=()=>!!D().players[S.demo?S.meDemo:S.me]?.admin;
+const isAdmin=()=>canAdmin()&&!S.asPlayer;
+const ADMIN_ONLY="Det kan kun administratoren.";
+function whoCard(text){
+  const ps=Object.values(D().players).filter(p=>!p.guest).sort((a,b)=>a.name.localeCompare(b.name,"da"));
+  return `<div class="card"><h2>Hvem er du?</h2><p class="muted">${text||"Vælg dit navn. Så kan du rette dit eget handicap og taste scorer for din bold."}</p>
+    <label class="f">Dit navn<select id="me-sel"><option value="">Vælg dit navn</option>${ps.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join("")}</select></label>
+    </div>`;
+}
+function whoBar(){
+  const me=myId();
+  return `<div class="whobar row small">${me?`<span>Du er <strong>${esc(pname(me))}</strong></span>`:`<span class="muted">Du har ikke valgt dit navn</span>`}
+    <span class="chip">${isAdmin()?"Administrator":"Spiller"}</span><span class="spacer"></span>
+    ${me?`<button class="ghost sm" data-act="logout">Log ud</button>`:""}
+    ${canAdmin()?`<button class="ghost sm" data-act="role">${S.asPlayer?"Tilbage til administrator":"Se som spiller"}</button>`:""}</div>`;
+}
+
+/* ---------- Login ---------- */
+// Login = DGU-nummer (2-3 cifre, bindestreg, cifre). Adgangskode = fødselsdato DDMMÅÅ første gang; kan skiftes.
+// Adgangskoden gemmes kun som PBKDF2-hash med salt. 5 forkerte forsøg låser i 15 minutter.
+const MAX_FAILS=5, LOCK_MIN=15;
+const normDgu=v=>v.trim().replace(/\s*[\s‐-―−.\/_]\s*/g,"-").replace(/-+/g,"-");
+const DGU_RE=/^\d{2,3}-\d+$/;
+function validBirth(pw){if(!/^\d{6}$/.test(pw))return false;const d=+pw.slice(0,2),m=+pw.slice(2,4);return d>=1&&d<=31&&m>=1&&m<=12}
+async function hashPw(pw,salt){
+  const k=await crypto.subtle.importKey("raw",new TextEncoder().encode(pw),"PBKDF2",false,["deriveBits"]);
+  const b=await crypto.subtle.deriveBits({name:"PBKDF2",salt:new TextEncoder().encode(salt),iterations:100000,hash:"SHA-256"},k,256);
+  return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("");
+}
+const logins=()=>D().logins||{};
+const needsAuth=()=>!S.demo&&!S.user;
+
+
+function vAuth(){
+  const reg=S.authTab==="reg";
+  const tabs=`<div class="seg" role="group" aria-label="Log ind eller opret login"><button data-act="authtab" data-k="login" aria-pressed="${!reg}">Log ind</button><button data-act="authtab" data-k="reg" aria-pressed="${reg}">Første gang</button></div>`;
+  const body=reg?`<p class="muted">Opret dit login. Login er dit DGU-nummer, og adgangskoden er din fødselsdato som DDMMÅÅ, fx 240763. Bagefter vælger du dit navn.</p>
+      <label class="f">DGU-nummer<input id="rg-dgu" type="text" inputmode="text" autocapitalize="off" autocorrect="off" autocomplete="username" placeholder="fx 123-4567"></label>
+      <label class="f">Fødselsdato (DDMMÅÅ)<input id="rg-pw" type="password" inputmode="numeric" autocomplete="new-password" maxlength="6" placeholder="DDMMÅÅ"></label>
+      <button class="primary" data-act="register">Opret login</button>`
+    :`<label class="f">DGU-nummer<input id="li-dgu" type="text" inputmode="text" autocapitalize="off" autocorrect="off" autocomplete="username" placeholder="fx 123-4567"></label>
+      <label class="f">Adgangskode<input id="li-pw" type="password" autocomplete="current-password" placeholder="Din fødselsdato DDMMÅÅ"></label>
+      <button class="primary" data-act="login">Log ind</button>
+      <p class="note">Første gang du bruger appen, skal du vælge "Første gang".</p>`;
+  return `<div class="card authcard"><h2>Velkommen til Tirsdagsklubben</h2>${tabs}<form id="authform" style="display:grid;gap:10px">${body}</form></div>`;
+}
+function vClaim(){
+  const free=Object.values(D().players).filter(p=>!p.guest&&!logins()[p.id]).sort((a,b)=>a.name.localeCompare(b.name,"da"));
+  return `<div class="card authcard"><h2>Hvem er du?</h2><p class="muted">Vælg dit navn. Det kan kun gøres én gang, så vælg det rigtige.</p>
+    <label class="f">Dit navn<select id="cl-pid"><option value="">Vælg dit navn</option>${free.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join("")}</select></label>
+    <button class="primary" data-act="claim">Det er mig</button>
+    ${free.length?"":`<p class="note">Alle navne er taget. Kontakt administratoren.</p>`}
+    <p class="note"><button class="ghost sm" data-act="logout">Log ud</button></p></div>`;
+}
+const dguEmail=dgu=>"dgu-"+dgu+"@tirsdagsklubben.dk";
+function authErr(e){const m=(e?.message||"").toLowerCase();
+  if(m.includes("invalid login"))return "Forkert DGU-nummer eller adgangskode";
+  if(m.includes("already registered")||m.includes("already been registered"))return "DGU-nummeret har allerede et login. Vælg \"Log ind\".";
+  if(m.includes("rate")||m.includes("too many"))return "For mange forsøg. Vent et par minutter og prøv igen.";
+  return "Det lykkedes ikke: "+(e?.message||"ukendt fejl")}
+async function doRegister(){
+  const dgu=normDgu($("#rg-dgu").value),pw=$("#rg-pw").value.trim();
+  if(!DGU_RE.test(dgu)){toast("DGU-nummeret skal være 2-3 cifre, en bindestreg og cifre, fx 123-4567","err");return}
+  if(!validBirth(pw)){toast("Fødselsdatoen skal være 6 cifre som DDMMÅÅ, fx 240763","err");return}
+  const {data,error}=await SB.auth.signUp({email:dguEmail(dgu),password:pw});
+  if(error){toast(authErr(error),"err");return}
+  if(!data.session){toast("Login er oprettet, men skal bekræftes. Kontakt administratoren.","err");return}
+  S.pendingDgu=dgu;toast("Dit login er oprettet. Vælg nu dit navn.","ok");
+}
+async function doClaim(){
+  const pid=$("#cl-pid").value;if(!pid){toast("Vælg dit navn","err");return}
+  const dgu=S.pendingDgu||(S.user?.email||"").replace(/^dgu-/,"").replace(/@.*/,"");
+  await safe(()=>put("logins/"+pid,{uid:S.user.id,dgu,changed:false,created:Date.now()}),"Velkommen, "+pname(pid)+"!");
+}
+async function doLogin(){
+  const dgu=normDgu($("#li-dgu").value),pw=$("#li-pw").value.trim();
+  if(!DGU_RE.test(dgu)){toast("Skriv dit DGU-nummer, fx 123-4567","err");return}
+  const {error}=await SB.auth.signInWithPassword({email:dguEmail(dgu),password:pw});
+  if(error){toast(authErr(error),"err");return}
+  toast("Du er logget ind","ok");
+}
+async function doChangePw(){
+  const me=myId();if(!me||!S.user)return;
+  const old=$("#cp-old").value.trim(),nw=$("#cp-new").value.trim(),nw2=$("#cp-new2").value.trim();
+  if(nw.length<6){toast("Den nye adgangskode skal være mindst 6 tegn","err");return}
+  if(nw!==nw2){toast("De to nye adgangskoder er ikke ens","err");return}
+  const chk=await SB.auth.signInWithPassword({email:S.user.email,password:old});
+  if(chk.error){toast("Den nuværende adgangskode er forkert","err");return}
+  const {error}=await SB.auth.updateUser({password:nw});
+  if(error){toast(authErr(error),"err");return}
+  safe(()=>put("logins/"+me,{changed:true},true),"Adgangskoden er skiftet");
+}
+
+/* ---------- Tilmelding ---------- */
+const OPEN_TUESDAYS = 3;          // antal åbne tirsdage frem
+const GUEST_OPEN = {daysBefore:2, hour:15}; // gæster fra søndag kl. 15
+const APP_START="2027-01-01"; // appen bruges fra sæson 2027; 2026 er historik fra regnearkene
+// De næste tirsdage, der ligger i en sæson fra 2027 og frem.
+function openTuesdays(){const today=localIso(new Date());return periods().filter(p=>p.end>=APP_START).flatMap(tuesdaysIn).filter(d=>d>=today&&d>=APP_START).sort().slice(0,OPEN_TUESDAYS)}
+function guestOpensAt(day){const d=new Date(day+"T00:00:00");d.setDate(d.getDate()-GUEST_OPEN.daysBefore);d.setHours(GUEST_OPEN.hour,0,0,0);return d}
+function signupInfo(day){
+  const all=Object.values((D().signups||{})[day]||{}).sort((a,b)=>(a.at||0)-(b.at||0));
+  const members=all.filter(e=>!e.guest),guests=all.filter(e=>e.guest);
+  const cap=Math.ceil(members.length/4)*4;
+  return {members,guests,free:Math.max(0,cap-members.length-guests.length),open:Date.now()>=guestOpensAt(day).getTime()};
+}
+/* Bolde: 4- og 3-bolde, så få gentagne makkere i sæsonen som muligt */
+const pairKey=(a,b)=>a<b?a+"|"+b:b+"|"+a;
+function pairHistory(day){
+  const per=periodOf(day),h={};
+  Object.values(D().rounds).forEach(r=>{
+    const rd=r.id.slice(0,10);if(!r.flights||rd>=day)return;if(per&&(rd<per.start||rd>per.end))return;
+    const by={};Object.entries(r.flights).forEach(([p,f])=>(by[f]=by[f]||[]).push(p));
+    Object.values(by).forEach(g=>{for(let i=0;i<g.length;i++)for(let j=i+1;j<g.length;j++){const k=pairKey(g[i],g[j]);h[k]=(h[k]||0)+1}});
+  });
+  return h;
+}
+function groupCost(groups,hist){let s=0;groups.forEach(g=>{for(let i=0;i<g.length;i++)for(let j=i+1;j<g.length;j++){const c=hist[pairKey(g[i],g[j])]||0;s+=c*c}});return s}
+function makeFlights(ids,hist){
+  const n=ids.length;if(!n)return {};
+  const g=Math.ceil(n/4),sizes=Array.from({length:g},(_,i)=>Math.floor(n/g)+(i<n%g?1:0));
+  let best=null,bc=Infinity;
+  for(let t=0;t<60;t++){
+    const sh=ids.slice();for(let i=sh.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[sh[i],sh[j]]=[sh[j],sh[i]]}
+    let k=0;const groups=sizes.map(sz=>{const x=sh.slice(k,k+sz);k+=sz;return x});
+    let c=groupCost(groups,hist);
+    for(let it=0;it<300&&c>0;it++){
+      const a=Math.floor(Math.random()*g),b=Math.floor(Math.random()*g);if(a===b)continue;
+      const i=Math.floor(Math.random()*groups[a].length),j=Math.floor(Math.random()*groups[b].length);
+      [groups[a][i],groups[b][j]]=[groups[b][j],groups[a][i]];
+      const nc=groupCost(groups,hist);if(nc<=c)c=nc;else [groups[a][i],groups[b][j]]=[groups[b][j],groups[a][i]];
+    }
+    if(c<bc){bc=c;best=groups.map(x=>x.slice())}
+    if(bc===0)break;
+  }
+  const fl={};best.forEach((gr,i)=>gr.forEach(p=>fl[p]=i+1));return fl;
+}
+function repeatPairs(fl,hist){let n=0;const by={};Object.entries(fl).forEach(([p,f])=>(by[f]=by[f]||[]).push(p));Object.values(by).forEach(g=>{for(let i=0;i<g.length;i++)for(let j=i+1;j<g.length;j++)if(hist[pairKey(g[i],g[j])])n++});return n}
+function draftSel(day){
+  const info=signupInfo(day),sel={};
+  if(info.members.length){info.members.forEach(e=>sel[e.id]=true);info.guests.forEach(e=>sel[e.id]=true)}
+  else Object.values(D().players).filter(p=>!p.guest).forEach(p=>sel[p.id]=true);
+  return sel;
+}
+function vSignup(){
+  const me=myId(),adm=isAdmin();
+  const members=Object.values(D().players).filter(p=>!p.guest).sort((a,b)=>a.name.localeCompare(b.name,"da"));
+  const cards=openTuesdays().map(day=>{
+    const {members:ms,guests,free,open}=signupInfo(day);
+    const n=ms.length+guests.length,isIn=me&&ms.some(e=>e.id===me);
+    const go=guestOpensAt(day);
+    const rm=e=>(adm||(!e.guest&&e.id===me)||(e.guest&&e.by===me))?` <button class="ghost sm" data-act="unsign" data-day="${day}" data-id="${e.id}" aria-label="Fjern">Fjern</button>`:"";
+    const list=ms.map(e=>`<li><span>${esc(pname(e.id))}${e.id===me?" (dig)":""}</span>${rm(e)}</li>`).join("")+guests.map(e=>`<li><span>${esc(e.name)} <span class="muted small">gæst af ${esc(pname(e.by))}${e.hi!=null?", hcp "+String(e.hi).replace(".",","):""}</span></span>${rm(e)}</li>`).join("");
+    let gst;
+    if(!open) gst=`<p class="note">Gæster kan tilføjes fra ${go.toLocaleDateString("da-DK",{weekday:"long",day:"numeric",month:"long"})} kl. ${GUEST_OPEN.hour}, hvis der er ledige pladser.</p>`;
+    else if(!free) gst=`<p class="note">Ingen ledige gæstepladser. Gæster kan kun fylde op, så antallet går op i hele 4-bolde.</p>`;
+    else if(!me&&!adm) gst=`<p class="note">${free} ledige gæstepladser. Vælg dit navn for at tilføje en gæst.</p>`;
+    else gst=`<div class="row" style="margin-top:8px"><label class="f" style="flex:1 1 140px">Gæstens navn<input id="gn-${day}" autocomplete="off"></label><label class="f">Handicap<input id="gh-${day}" inputmode="decimal" style="width:80px"></label><button data-act="addguest" data-day="${day}" style="align-self:end">Tilføj gæst</button></div><p class="note">${free} ${free===1?"ledig gæsteplads":"ledige gæstepladser"}.</p>`;
+    return `<div class="card">
+      <div class="row"><div><h2>${esc(fmtDate(day))}</h2><div class="small muted">${courseFor(day)?esc(course(courseFor(day)).name)+" · ":""}${isFinale({id:day})?"Finale · ":""}${ms.length} tilmeldt${guests.length?` · ${guests.length} ${guests.length===1?"gæst":"gæster"}`:""} · ${Math.ceil(n/4)||0} ${Math.ceil(n/4)===1?"bold":"bolde"}</div></div><span class="spacer"></span>
+      ${me?(isIn?`<button data-act="unsign" data-day="${day}" data-id="${me}">Afmeld mig</button>`:`<button class="primary" data-act="sign" data-day="${day}">Tilmeld mig</button>`):""}</div>
+      ${n?`<ol class="signlist">${list}</ol>`:`<p class="muted">Ingen tilmeldte endnu.</p>`}
+      ${adm&&n>=2?`<div class="row" style="margin-bottom:8px"><button class="primary" data-act="gobolde" data-day="${day}">Lav bolde for denne dag</button></div>`:""}
+      ${adm?`<div class="row"><select id="as-${day}" aria-label="Tilmeld medlem"><option value="">Tilmeld et medlem…</option>${members.filter(p=>!ms.some(e=>e.id===p.id)).map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join("")}</select></div>`:""}
+      ${gst}
+    </div>`;
+  }).join("");
+  return (!me&&!adm?whoCard("Vælg dit navn for at tilmelde eller afmelde dig."):"")+cards;
+}
+
+/* ---------- Visninger ---------- */
+function render(){
+  const v=S.forceView||(location.hash||"#live").slice(1);
+  S.view=["live","indtast","tilmeld","saeson","spillere","runde"].includes(v)?v:"live";
+  document.querySelectorAll("#tabs a").forEach(a=>a.setAttribute("aria-current",a.getAttribute("href")==="#"+S.view?"page":"false"));
+  const r=currentRound();
+  $("#sub").innerHTML=r?`${r.status==="live"?'<span class="live-dot"></span>Live · ':""}${esc(course(r.course).name)}<br>${esc(fmtDate(r.id))}`:"";
+  let b="";
+  if(S.demo) b=`<div class="banner"><div class="wrap"><strong>Ikke forbundet.</strong> Appen kan ikke nå databasen lige nu. Tjek internetforbindelsen og genindlæs siden.${S.mode==="nodb"?"":` <button class="ghost" data-act="stopdemo">Tilbage til jeres data</button>`}</div></div>`;
+  else if(S.stale) b=`<div class="banner"><div class="wrap">Kan ikke hente de nyeste tal lige nu. Det du ser, kan være forældet.</div></div>`;
+  $("#banner").innerHTML=b;
+  if(S.mode==="loading"&&!S.demo) return;
+  const f={live:vLive,indtast:vEnter,tilmeld:vSignup,saeson:vSeason,spillere:vPlayers,runde:vRound}[S.view];
+  const focus=document.activeElement?.id;
+  if(!S.demo){const e=Object.entries(logins()).find(([,l])=>S.user&&l.uid===S.user.id);S.me=e?e[0]:null}
+  const gate=needsAuth(),claim=!gate&&!S.demo&&S.loginsLoaded&&!S.me;
+  $("#tabs").hidden=gate||claim;
+  $("#view").innerHTML=gate?vAuth():claim?vClaim():whoBar()+f();
+  if(focus&&document.getElementById(focus)&&document.getElementById(focus).tagName==="INPUT")document.getElementById(focus).focus();
+}
+function emptyCard(title,text,btns){return `<div class="card empty"><h2>${title}</h2><p class="muted">${text}</p><div class="row" style="justify-content:center">${btns||""}</div></div>`}
+const demoBtn=()=>"";
+
+function scorecard(r,t){
+  const c=courseR(r.course,r.tee);
+  const half=(a,b)=>{
+    let hh="",pp="",ss="",ps=0,gs=0,full=true;
+    for(let h=a;h<b;h++){
+      const x=t.hv[h],s=strokesOn(t.ph,c.si[h]);
+      hh+=`<th>${h+1}</th>`;pp+=`<td>${c.par[h]}${s>0?'<sup class="dots">'+"•".repeat(s)+"</sup>":""}</td>`;ps+=c.par[h];
+      if(x.st==="conflict"){ss+=`<td class="c" title="Afvigelse: ${x.vals.map(v=>esc(pname(v.by))+" "+v.v).join(", ")}">!</td>`;full=false}
+      else if(x.st==="none"){ss+="<td></td>";full=false}
+      else{const d=x.v-c.par[h];const cls=d<=-2?"eagle":d===-1?"birdie":d===1?"bogey":d>=2?"dbl":"";ss+=`<td class="${x.st==="one"?"one":""}"><span class="s ${cls}">${x.v}</span></td>`;gs+=x.v}
+    }
+    return `<tr><td class="lbl">Hul</td>${hh}<th>${a?"Ind":"Ud"}</th></tr><tr><td class="lbl">Par</td>${pp}<td>${ps}</td></tr><tr><td class="lbl">Score</td>${ss}<td><strong>${gs||""}</strong></td></tr>`;
+  };
+  return `<div class="sc-wrap"><table class="sc">${half(0,9)}</table><div style="height:8px"></div><table class="sc">${half(9,18)}</table>
+  <p class="note" style="margin:8px 2px 0">HCP ${t.hi==null?"–":String(t.hi).replace(".",",")} · spillehandicap ${t.ph} · ${t.stb} stableford-point · brutto ${t.gross||"–"} (${fmtPar(t.toPar)}) · netto ${fmtPar(t.netToPar)}${t.unconf?` · ${t.unconf} hul kun tastet af én`:""}</p></div>`;
+}
+
+function vLive(){
+  const r=currentRound();
+  if(!r) return emptyCard("Ingen runder endnu","Når en runde er startet under Runde, vises stillingen her og opdaterer sig selv, mens der tastes ude på banen.",`<a class="btn" href="#runde">Start en runde</a>${demoBtn()}`);
+  if(S.boardRid!==r.id){S.boardRid=r.id;S.board=r.match||"stb"}
+  const key={stb:["stb",-1],gross:["toPar",1],net:["netToPar",1]}[S.board];
+  const list=ranked((r.players||[]).map(p=>playerTotals(r,p)),key[0],key[1]);
+  const cf=conflictList(r);
+  const alert=cf.length?`<div class="alert"><strong>${cf.length===1?"1 afvigelse":cf.length+" afvigelser"} skal rettes</strong><ul>${cf.map(x=>`<li>${esc(pname(x.pid))}, hul ${x.h+1}: ${x.vals.map(v=>esc(pname(v.by))+" tastede "+v.v).join(", ")}</li>`).join("")}</ul></div>`:"";
+  const rows=list.map(t=>{
+    const val=S.board==="stb"?t.stb:fmtPar(S.board==="gross"?t.toPar:t.netToPar);
+    const under=S.board!=="stb"&&(S.board==="gross"?t.toPar:t.netToPar)<0;
+    const thru=t.thru===18&&!t.conflicts?"F":(t.thru||"–");
+    const open=S.open===t.pid;
+    return `<tr class="p ${t.conflicts?"conf":""}" data-act="open" data-pid="${t.pid}" aria-expanded="${open}">
+      <td class="pos">${t.pos?(t.tie?"T":"")+t.pos:"–"}</td>
+      <td class="name">${esc(pname(t.pid))}${t.conflicts?' <span class="chip warn">afvigelse</span>':""}<small>Bold ${r.flights?.[t.pid]??"–"} · spillehcp ${t.ph}</small></td>
+      <td class="num">${thru}</td>
+      <td class="num tot ${under?"u":""}">${t.thru?val:"–"}</td></tr>
+      ${open?`<tr><td colspan="4" class="card-cell">${scorecard(r,t)}</td></tr>`:""}`;
+  }).join("");
+  const seg=[["stb","Stableford"],["gross","Slag brutto"],["net","Slag netto"]].map(([k,l])=>`<button data-act="board" data-k="${k}" aria-pressed="${S.board===k}">${l}</button>`).join("");
+  return `${alert}<div class="card">
+    <div class="row" style="margin-bottom:10px"><div><h2>${r.status==="live"?"Leaderboard":"Resultat"}</h2><div class="small muted">Dagens match: ${MATCH[r.match||"stb"]}${isFinale(r)?" · finale":""}${r.counts===false?" · tæller ikke i sæsonen":""}</div></div><span class="spacer"></span><div class="seg" role="group" aria-label="Spilleform">${seg}</div></div>
+    <div class="tbl-wrap"><table class="lb"><colgroup><col style="width:44px"><col><col style="width:48px"><col style="width:64px"></colgroup><thead><tr><th>Pos</th><th>Spiller</th><th class="num">Hul</th><th class="num">${S.board==="stb"?"Point":"Score"}</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="note">Tryk på en spiller for at se scorekortet. Huller med afvigelse tæller ikke med, før de er rettet. Lysere tal er kun tastet af én markør.</p>
+  </div>`;
+}
+
+function vEnter(){
+  const r=currentRound();
+  if(!r||r.status!=="live") return emptyCard("Ingen aktiv runde","Scorer kan tastes, når en runde er startet under Runde.",`<a class="btn" href="#runde">Gå til Runde</a>${demoBtn()}`);
+  const me=myId();
+  const picker=isAdmin()?`<label class="f">Tast som (administrator)<select id="act-sel"><option value="">Vælg spiller</option>${(r.players||[]).slice().sort((a,b)=>pname(a).localeCompare(pname(b),"da")).map(p=>`<option value="${p}" ${p===me?"selected":""}>${esc(pname(p))}</option>`).join("")}</select></label>`:"";
+  if(!me) return whoCard("Vælg dit navn. Du taster for hele din bold, og en makker i bolden taster også. Hvis I taster forskelligt, bliver hullet markeret med rødt.");
+  if(!r.flights?.[me]) return `<div class="card"><h2>Du er ikke med i dagens runde</h2><p class="muted">Du kan kun taste scorer for din egen bold. Spørg administratoren, hvis du mangler på startlisten.</p>${picker}</div>`;
+  const c=courseR(r.course,r.tee),fl=r.flights[me];
+  const mates=(r.players||[]).filter(p=>r.flights[p]===fl);
+  const all=D().entries[r.id]||{};
+  const mine=all[me]||{by:me,flight:fl,scores:{}};
+  const others=Object.values(all).filter(e=>e.flight===fl&&e.by!==me);
+  const h=S.hole-1;
+  const holeState=i=>{
+    let anyC=false,done=true;
+    mates.forEach(p=>{const v=mine.scores[p]?.[i];if(!(v>0))done=false;others.forEach(o=>{const ov=o.scores?.[p]?.[i];if(v>0&&ov>0&&ov!==v)anyC=true})});
+    return anyC?"c":done?"done":"";
+  };
+  const strip=Array.from({length:18},(_,i)=>`<button data-act="hole" data-h="${i+1}" class="${holeState(i)} ${i===h?"cur":""}" aria-label="Hul ${i+1}">${i+1}</button>`).join("");
+  const pls=mates.map(p=>{
+    const v=mine.scores[p]?.[h];
+    const ph=playingHcp((r.hcp?.[p]??D().players[p]?.hi??0),courseR(r.course,teeOf(r,p))),s=strokesOn(ph,c.si[h]);
+    const diff=others.map(o=>({by:o.by,v:o.scores?.[p]?.[h]})).filter(o=>o.v>0&&v>0&&o.v!==v);
+    return `<div class="pl ${diff.length?"c":""}">
+      <div class="who">${esc(pname(p))}${p===me?" (dig)":""}<small>Tee ${esc(teeOf(r,p))} · spillehcp ${ph}${s>0?` · <span class="dots">${"•".repeat(s)}</span> ${s} slag her`:""}</small></div>
+      <div class="step"><button data-act="dec" data-pid="${p}" aria-label="Et slag mindre">−</button>
+        <div class="val" data-act="par" data-pid="${p}" role="button" tabindex="0" aria-label="Score">${v>0?v:"–"}</div>
+        <button data-act="inc" data-pid="${p}" aria-label="Et slag mere">+</button></div>
+      ${diff.length?`<div class="mm">Afvigelse: ${diff.map(o=>esc(pname(o.by))+" har tastet "+o.v).join(", ")}. Aftal den rigtige score og ret den.</div>`:""}
+    </div>`;
+  }).join("");
+  const conf=[];for(let i=0;i<18;i++)if(holeState(i)==="c")conf.push(i+1);
+  return `<div class="card">
+      <div class="holehead"><div class="big">Hul ${h+1}</div><div class="meta">Par ${c.par[h]}<br>Index ${c.si[h]}</div><span class="spacer"></span>
+      <button data-act="hole" data-h="${Math.max(1,h)}" ${h===0?"disabled":""} aria-label="Forrige hul">‹</button><button data-act="hole" data-h="${Math.min(18,h+2)}" ${h===17?"disabled":""} aria-label="Næste hul">›</button></div>
+      <div class="strip">${strip}</div>
+    </div>
+    ${conf.length?`<div class="alert">Afvigelse på hul ${conf.join(", ")}. Tryk på hullet og ret det med din makker.</div>`:""}
+    <div class="card">${pls}
+      <div class="row" style="margin-top:12px">${others.length?`<span class="chip">Makker-indtastning: ${others.map(o=>esc(pname(o.by))).join(", ")}</span>`:`<span class="chip">Ingen makker har tastet endnu</span>`}<span class="spacer"></span>
+      ${h<17?`<button class="primary" data-act="hole" data-h="${h+2}">Næste hul</button>`:`<a class="btn primary" href="#live" style="background:var(--board);color:var(--board-ink)">Se leaderboard</a>`}</div>
+    </div>
+    <div class="card"><label class="f">Din tee i dag<select id="my-tee">${Object.entries(c.tees||{}).map(([t,v])=>`<option value="${t}" ${t===teeOf(r,me)?"selected":""}>${t} (CR ${String(v.cr).replace(".",",")} / slope ${v.slope})</option>`).join("")}</select></label>${picker}<p class="note">Bold ${fl} · ${esc(c.name)}. Du kan kun taste for din egen bold. Tryk på tallet for at sætte par.</p></div>`;
+}
+
+function vSeason(){
+  const ps=periods(),today=localIso(new Date());
+  if(!ps.length) return emptyCard("Ingen sæsoner","Administratoren opretter sæsoner under Runde → Sæsonplan.","")+cfgCard();
+  const withRounds=ps.filter(p=>Object.values(D().rounds).some(r=>r.status==="done"&&r.id>=p.start&&r.id.slice(0,10)<=p.end));
+  const per=ps.find(p=>p.id===S.period)||ps.find(p=>p.start>=APP_START&&today<=p.end)||withRounds[withRounds.length-1]||ps[ps.length-1];
+  const {rows,rounds,cfg}=seasonTable(per);
+  const short=iso=>{const d=new Date(iso.slice(0,10)+"T12:00:00");return d.getDate()+"/"+(d.getMonth()+1)};
+  const nf=n=>String(n).replace(".",",");
+  const head=rounds.map(r=>`<th class="d" title="${esc(fmtDate(r.id))}">${short(r.id)}<small>${isFinale(r)?"Finale":(r.course?esc(course(r.course).name.replace(" Course","")):"")}</small></th>`).join("");
+  const body=rows.map(r=>`<tr><td class="pos">${r.pos}</td><td class="nm"><strong>${esc(pname(r.pid))}</strong></td>
+    <td class="r big">${nf(r.total)}</td><td class="r">${r.n}</td><td class="r">${r.wins||""}</td>
+    ${rounds.map(x=>{const v=r.cells[x.id];return v==null?'<td class="d"></td>':`<td class="d ${r.counting.has(x.id)?"cnt":""}" title="${v.tie?"T":""}${v.pos}. plads, ${v.stb} stableford-point">${nf(v.pts)}${cfg.mode==="stb"?"":`<small>${v.stb}</small>`}</td>`}).join("")}</tr>`).join("");
+  const fin=tuesdaysIn(per).slice(-(Number(per.finales??2))).filter(()=>Number(per.finales??2)>0);
+  return `<div class="card">
+    <div class="row" style="margin-bottom:10px"><h2>${esc(per.name)}</h2><span class="spacer"></span><select id="per-sel" aria-label="Vælg sæson">${ps.slice().reverse().map(p=>`<option value="${p.id}" ${p.id===per.id?"selected":""}>${esc(p.name)}</option>`).join("")}</select></div>
+    <p class="small muted" style="margin:-4px 0 10px">${per.closed?'<span class="chip">Afsluttet</span> ':""}${esc(fmtDate(per.start))} til ${esc(fmtDate(per.end))}${fin.length?` · finale ${fin.map(d=>esc(fmtDate(d))).join(" og ")}`:""}</p>
+    ${rows.length?`<div class="tbl-wrap"><table class="tbl season"><thead><tr><th>Nr.</th><th class="nm">Spiller</th><th class="r">Point</th><th class="r">Runder</th><th class="r">Sejre</th>${head}</tr></thead><tbody>${body}</tbody></table></div>`:`<p class="muted">Ingen afsluttede runder i denne sæson endnu.</p>`}
+    <p class="note">${cfg.mode==="stb"?"Tallene er dagens stableford-point. Markerede felter tæller.":"Stort tal er point, lille tal er dagens stableford."} ${cfgText(cfg)} ${rounds.length} ${rounds.length===1?"tirsdag":"tirsdage"} spillet.</p>
+  </div>`+(per.rules?"":cfgCard());
+}
+function vPlan(){
+  const ps=periods(),opts=k=>Object.keys(COURSES_DEFAULT).map(c=>`<option value="${c}" ${c===k?"selected":""}>${esc(course(c).name)}</option>`).join("");
+  const items=ps.slice().reverse().map(p=>{
+    const open=S.planOpen===p.id,ts=tuesdaysIn(p),n=Number(p.finales??2),fins=n>0?ts.slice(-n):[];
+    return `<div class="flight">
+      <div class="row"><strong>${esc(p.name)}</strong><span class="small muted">${ts.length} tirsdage</span><span class="spacer"></span>${p.closed?`<span class="chip">Afsluttet</span>`:`<button class="sm" data-act="planopen" data-id="${p.id}">${open?"Luk":"Ret"}</button>`}</div>
+      ${open&&!p.closed?`<div class="row" style="margin-top:8px"><label class="f" style="flex:1 1 140px">Navn<input id="pn-${p.id}" value="${esc(p.name)}"></label>
+        <label class="f">Start<input type="date" id="ps-${p.id}" value="${p.start}"></label><label class="f">Slut<input type="date" id="pe-${p.id}" value="${p.end}"></label>
+        <label class="f">Finaler<input id="pf-${p.id}" inputmode="numeric" style="width:70px" value="${n}"></label></div>
+        <div class="row" style="margin-top:8px"><button class="primary sm" data-act="plansave" data-id="${p.id}">Gem sæson</button><button class="sm ghost" data-act="plandel" data-id="${p.id}">Slet sæson</button></div>
+        <h3 style="margin-top:12px">Baner</h3>
+        <div class="chk">${ts.map(day=>`<label style="justify-content:space-between"><span>${new Date(day+"T12:00:00").toLocaleDateString("da-DK",{day:"numeric",month:"short"})}${fins.includes(day)?' <span class="chip">Finale</span>':""}</span><select id="sc-${day}" aria-label="Bane ${day}"><option value="">Ikke valgt</option>${opts(courseFor(day))}</select></label>`).join("")}</div>`:""}
+    </div>`;}).join("");
+  return `<div class="card"><h2>Sæsonplan</h2><p class="small muted">Sæsonernes start, slut og antal finaler, og hvilken bane der spilles hver tirsdag. De sidste tirsdage i sæsonen er finaler med ${seasonCfg().finaleMult} gange point. Antallet sættes pr. sæson.</p>
+    <div style="display:grid;gap:10px">${items}</div>
+    <div class="row" style="margin-top:12px"><button data-act="planadd">Ny sæson</button></div></div>`;
+}
+function savePeriods(list){return safe(()=>put("config/periods",{list}),"Sæsonplanen er gemt")}
+function cfgText(c){
+  if(c.mode==="pct") return `Procentpoint: vinderen får 40 point plus 5 pr. deltager, dog højst 100 (4 spillere = 60, 8 = 80, 12 eller flere = 100). Sidstepladsen får det halve, og resten fordeles jævnt imellem. ${c.bestOf>0?`De ${c.bestOf} bedste tirsdage tæller.`:"Alle tirsdage tæller."} Finalerunder giver ${c.finaleMult} gange point. Står flere lige, deler de pointene.`;
+  if(c.mode==="stb") return `Gamle regler: point er dagens stableford-point, og de ${c.bestOf} bedste runder lægges sammen. Ingen finaler med dobbelt point.`;
+  return (c.mode==="field"?"Hver tirsdag spiller man om 1 point for hver deltager: vinderen får lige så mange point, som der er deltagere, nr. 2 får én mindre og så videre, og sidstepladsen får 1. Jo flere der stiller op, jo flere point er der at spille om."
+    :`Point efter dagens placering: ${c.scale.join(", ")}. Nr. ${c.scale.length} og alle efter får ${c.scale[c.scale.length-1]}.`)
+    +` ${c.bestOf>0?`De ${c.bestOf} bedste tirsdage tæller.`:"Alle tirsdage tæller."} Finalerunder giver ${c.finaleMult} gange point. Står flere lige, deler de pointene.`;
+}
+function cfgCard(){
+  const c=seasonCfg();
+  if(!isAdmin()) return `<div class="card"><h3>Pointmodel</h3><p class="small muted" style="margin:0">${cfgText(c)} Kun administratoren kan ændre modellen.</p></div>`;
+  return `<div class="card"><h3>Pointmodel</h3>
+    <p class="small muted" style="margin:0 0 10px">${cfgText(c)}</p>
+    <div class="row"><label class="f">Model<select id="cfg-mode"><option value="field" ${c.mode==="field"?"selected":""}>Point efter feltets størrelse</option><option value="pct" ${c.mode==="pct"?"selected":""}>Procentpoint (vinder op til 100, sidst det halve)</option><option value="scale" ${c.mode==="scale"?"selected":""}>Fast pointskala</option></select></label>
+    <label class="f" style="flex:1 1 220px">Point pr. placering (fast skala)<input id="cfg-scale" value="${c.scale.join(", ")}"></label>
+    <label class="f">Tællende runder<input id="cfg-best" inputmode="numeric" style="width:90px" value="${c.bestOf||""}" placeholder="alle"></label>
+    <label class="f">Finalegange<input id="cfg-mult" inputmode="decimal" style="width:80px" value="${c.finaleMult}"></label>
+    <button data-act="savecfg" style="align-self:end">Gem model</button></div></div>`;
+}
+
+function vPlayers(){
+  const ps=Object.values(D().players).filter(p=>!p.guest).sort((a,b)=>a.name.localeCompare(b.name,"da"));
+  const yr=String(new Date().getFullYear()>2026?new Date().getFullYear():2027);
+  const count=pid=>Object.values(D().rounds).filter(r=>r.status==="done"&&r.results?.[pid]).length;
+  const me=myId(),adm=isAdmin();
+  const rows=ps.map(p=>{const ed=adm||p.id===me;const hi=String(p.hi??"").replace(".",",");
+    return `<tr${p.id===me?' style="background:var(--soft)"':""}><td>${ed?`<input id="name-${p.id}" data-pid="${p.id}" value="${esc(p.name)}" style="width:100%;min-width:120px" aria-label="Navn">`:`<strong>${esc(p.name)}</strong>`}</td>
+    <td>${ed?`<input id="hi-${p.id}" inputmode="decimal" style="width:80px" value="${hi}" placeholder="fx 18,4" data-pid="${p.id}" aria-label="Handicap for ${esc(p.name)}">`:(hi||'<span class="muted">–</span>')}</td>
+    <td class="r">${count(p.id)}</td>${adm?`<td>${logins()[p.id]?`<span class="chip">Login</span> <button class="ghost sm" data-act="resetlogin" data-pid="${p.id}">Nulstil</button>`:'<span class="muted small">Ikke oprettet</span>'}</td>`:""}</tr>`}).join("");
+  const missing=ps.filter(p=>p.hi==null).length;
+  return `${!me&&!adm?whoCard("Vælg dit navn, så kan du rette dit eget navn og handicap."):""}<div class="card"><h2>Spillere</h2>
+    <p class="muted small">${adm?"Som administrator kan du rette alle spillere.":"Du kan kun rette dit eget navn og handicap."} Et nyt handicap bruges fra næste runde.</p>${missing?`<p class="chip warn">${missing} spillere mangler handicap</p>`:""}
+    ${ps.length?`<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Navn</th><th>Handicap</th><th class="r">Runder spillet</th>${adm?"<th>Login</th>":""}</tr></thead><tbody>${rows}</tbody></table></div>`:`<p class="muted">Ingen spillere endnu. Tilføj gruppen herunder.</p>`}
+  </div>
+  ${me&&D().players[me]?`<div class="card"><h3>Mit teested</h3><p class="small muted" style="margin:0 0 8px">Bruges automatisk, når en runde startes. Du kan også skifte tee på selve dagen under Indtast.</p><div class="row">${Object.keys(COURSES_DEFAULT).map(cid=>{const c=course(cid),cur=D().players[me]?.tee?.[cid]||c.defaultTee;return `<label class="f">${esc(c.name)}<select id="pt-${cid}" data-c="${cid}">${Object.entries(c.tees||{}).map(([t,v])=>`<option value="${t}" ${t===cur?"selected":""}>${t} (CR ${String(v.cr).replace(".",",")} / slope ${v.slope})</option>`).join("")}</select></label>`}).join("")}</div></div>`:""}
+  ${me&&logins()[me]?`<div class="card"><h3>Skift adgangskode</h3>${logins()[me].changed?"":`<p class="small muted" style="margin:0 0 8px">Din adgangskode er stadig din fødselsdato. Den er let at gætte, så skift den gerne.</p>`}
+    <div class="row"><label class="f">Nuværende<input id="cp-old" type="password" autocomplete="current-password" style="width:130px"></label><label class="f">Ny<input id="cp-new" type="password" autocomplete="new-password" style="width:130px"></label><label class="f">Gentag ny<input id="cp-new2" type="password" autocomplete="new-password" style="width:130px"></label><button data-act="changepw" style="align-self:end">Skift</button></div></div>`:""}
+  ${adm?`<div class="card"><h3>Tilføj spiller</h3>
+    <div class="row"><label class="f" style="flex:1 1 160px">Navn<input id="np-name" autocomplete="off"></label><label class="f">Handicap<input id="np-hi" inputmode="decimal" style="width:90px"></label><button class="primary" data-act="addplayer" style="align-self:end">Tilføj</button></div>
+  </div>`:""}`;
+}
+
+function boldeTop(live){
+  const adm=isAdmin(),day=S.draft?.date||openTuesdays()[0]||nextTuesday();
+  const n=S.draft?Object.values(S.draft.sel).filter(Boolean).length:Object.keys(draftSel(day)).length;
+  const why=S.demo?"Appen er ikke forbundet til databasen lige nu, så bolde kan ikke laves. Luk appen og åbn den igen."
+    :!adm?(canAdmin()?"Du ser appen som spiller. Tryk \"Tilbage til administrator\" øverst.":"Kun administratoren kan lave bolde.")
+    :n<2?"Der skal være mindst 2 spillere tilmeldt.":"";
+  return `<div class="card" id="boldetop" style="border:2px solid var(--flag)"><h2>Lav bolde</h2>
+    <p class="small muted" style="margin:4px 0 10px">${esc(fmtDate(day))} · ${n} spillere${live?" · der er en aktiv runde i gang":""}</p>
+    <button class="primary" data-act="quickshuffle" style="width:100%;font-size:18px;min-height:52px" ${why?"disabled":""}>${S.draft?.flights?"Lav bolde igen":"Lav bolde"} (${n} spillere)</button>
+    ${why?`<p class="alert" style="margin:10px 0 0">${why}</p>`:`<p class="note" style="margin:8px 0 0">Boldene vises længere nede under "Ny runde", hvor du kan flytte spillere og starte runden.</p>`}</div>`;
+}
+function vRound(){
+  const r=currentRound(),live=r&&r.status==="live",adm=isAdmin();
+  let html=boldeTop(live);
+  if(live){
+    const nf=Math.max(...Object.values(r.flights||{1:1}));
+    const fl=Array.from({length:nf},(_,i)=>i+1).map(n=>`<div class="flight"><h3>Bold ${n}</h3>${(r.players||[]).filter(p=>r.flights[p]===n).map(p=>`<div class="row" style="justify-content:space-between;margin:4px 0"><span>${esc(pname(p))}</span>${adm?`<select id="fl-${p}" data-act="moveflight" data-pid="${p}" aria-label="Flyt ${esc(pname(p))} til bold">${Array.from({length:nf+1},(_,i)=>`<option value="${i+1}" ${i+1===n?"selected":""}>Bold ${i+1}</option>`).join("")}</select>`:""}</div>`).join("")}</div>`).join("");
+    const cf=conflictList(r).length;
+    html+=`<div class="card"><div class="row"><h2>Aktiv runde</h2><span class="chip"><span class="live-dot"></span>Live</span></div>
+      <p class="muted">${esc(fmtDate(r.id))} · ${esc(course(r.course).name)} · tee ${esc(r.tee||course(r.course).defaultTee)} · ${MATCH[r.match||"stb"]} · ${(r.players||[]).length} spillere</p>
+      <div class="flights">${fl}</div>
+      ${!adm?"":`<div class="row" style="margin-top:14px">${S.confirmEnd?`<span class="small">${cf?`<strong style="color:var(--warn)">${cf} afvigelser er ikke rettet.</strong> `:""}Afslut runden og giv sæsonpoint?</span><span class="spacer"></span><button data-act="noend">Fortryd</button><button class="danger" data-act="end">Ja, afslut</button>`:`<span class="spacer"></span><button class="primary" data-act="askend">Afslut runde</button>`}</div>`}</div>`;
+  }else if(r&&r.status==="done"){
+    html+=`<div class="card row"><span>Seneste runde: ${esc(fmtDate(r.id))} er afsluttet.</span><span class="spacer"></span>${adm&&!r.imported?`<button data-act="reopen">Genåbn</button>`:""}</div>`;
+  }
+  if(!adm) return html+`<div class="card"><p class="muted" style="margin:0">Kun administratoren kan oprette runder, fordele bolde og afslutte runder.</p></div>`;
+  const ps0=Object.values(D().players).filter(p=>!p.guest).sort((a,b)=>a.name.localeCompare(b.name,"da"));
+  if(!ps0.length) return html+emptyCard("Tilføj spillere først","Før I kan starte en runde, skal gruppen være oprettet med navn og handicap.",`<a class="btn" href="#spillere">Gå til Spillere</a>${demoBtn()}`);
+  const d=S.draft||(S.draft={date:openTuesdays()[0]||nextTuesday(),course:courseFor(openTuesdays()[0]||nextTuesday())||"old",match:"stb",counts:true,sel:draftSel(openTuesdays()[0]||nextTuesday()),flights:null});
+  const ps=ps0.concat(signupInfo(d.date).guests.map(g=>({id:g.id,name:g.name+" (gæst)",hi:g.hi,guest:true})));
+  const hasSign=signupInfo(d.date).members.length>0;
+  const sel=ps.filter(p=>d.sel[p.id]);
+  const nfl=d.flights?Math.max(0,...Object.values(d.flights)):0,hist=d.flights?pairHistory(d.date):{};
+  const fls=d.flights?Array.from({length:nfl},(_,i)=>i+1).map(n=>{const g=sel.filter(p=>d.flights[p.id]===n);return `<div class="flight"><h3>Bold ${n} <span class="small muted">(${g.length})</span></h3>${g.map(p=>{const mates=g.filter(o=>o.id!==p.id&&hist[pairKey(p.id,o.id)]).length;return `<div class="row" style="justify-content:space-between;margin:4px 0"><span>${esc(p.name)}${mates?` <span class="small muted" title="Har spillet med ${mates} i bolden før i sæsonen">↺${mates}</span>`:""}</span><select id="df-${p.id}" data-pid="${p.id}" aria-label="Flyt ${esc(p.name)}">${Array.from({length:nfl+1},(_,i)=>`<option value="${i+1}" ${i+1===n?"selected":""}>Bold ${i+1}</option>`).join("")}</select></div>`}).join("")}</div>`}).join("")
+    +`<p class="note" style="grid-column:1/-1">${repeatPairs(d.flights,hist)?`${repeatPairs(d.flights,hist)} makkerpar har spillet sammen før i sæsonen (↺).`:"Ingen har spillet sammen før i sæsonen."} Du kan flytte spillere mellem boldene eller trykke "Lav bolde" igen.</p>`:"";
+  html+=`<div class="card"><h2>Ny runde</h2>
+    <div class="row" style="margin:10px 0"><label class="f">Dato<input type="date" id="nr-date" value="${d.date}"></label>
+    <label class="f">Bane<select id="nr-course">${Object.keys(COURSES_DEFAULT).map(k=>`<option value="${k}" ${k===d.course?"selected":""}>${esc(course(k).name)}</option>`).join("")}</select></label>
+    <label class="f">Tee for gæster og spillere uden valg<select id="nr-tee">${Object.entries(course(d.course).tees||{}).map(([t,v])=>`<option value="${t}" ${t===(d.tee||course(d.course).defaultTee)?"selected":""}>${t} (CR ${String(v.cr).replace(".",",")} / slope ${v.slope})</option>`).join("")}</select></label>
+    <label class="f">Dagens match<select id="nr-match">${Object.entries(MATCH).map(([k,l])=>`<option value="${k}" ${k===d.match?"selected":""}>${l}</option>`).join("")}</select></label></div>
+    <label class="row small" style="margin-bottom:10px"><input type="checkbox" id="nr-counts" ${d.counts?"checked":""}> Tæller i sæsonstillingen (altid som stableford)</label>
+    ${isFinale({id:d.date})?`<p class="chip" style="margin:0 0 10px">Finale: ${seasonCfg().finaleMult} gange point</p>`:""}
+    <div class="row" style="margin:6px 0 12px"><button class="primary" data-act="shuffle" ${sel.length<2?"disabled":""}>${d.flights?"Lav bolde igen":"Lav bolde"} (${sel.length} spillere)</button></div>
+    <details id="selbox" ${S.selOpen||!hasSign?"open":""}><summary class="small" style="cursor:pointer;padding:6px 0"><strong>Hvem spiller? (${sel.length})</strong>${hasSign?` · udfyldt fra tilmeldingen til ${esc(fmtDate(d.date))}. Tryk for at rette.`:""}</summary>
+    <div class="chk">${ps.map(p=>`<label><input type="checkbox" id="sel-${p.id}" data-pid="${p.id}" ${d.sel[p.id]?"checked":""}> ${esc(p.name)}</label>`).join("")}</div></details>
+    <div class="row" style="margin-top:14px"><span class="spacer"></span>${live?`<span class="small muted">Afslut den aktive runde ovenfor, før du starter en ny.</span>`:""}<button class="primary" data-act="start" ${live||!d.flights||sel.length<2?"disabled":""}>Start runde</button></div>
+    ${fls?`<div class="flights" style="margin-top:12px">${fls}</div>`:`<p class="note">Tryk "Lav bolde", så fordeler appen spillerne i 4- og 3-bolde, så folk spiller med så mange forskellige som muligt i løbet af sæsonen.</p>`}
+    ${course(d.course).provisional?`<p class="note">Par og index pr. hul for ${esc(course(d.course).name)} er foreløbige, indtil vi har scorekortet. CR og slope er de rigtige.</p>`:""}
+  </div>`;
+  return html+vPlan();
+}
+
+/* ---------- Handlinger ---------- */
+function setScore(pid,v){
+  const r=currentRound(),me=myId(),fl=r.flights[me];
+  const all=D().entries[r.id]||(D().entries[r.id]={});
+  const e=clone(all[me])||{by:me,flight:fl,scores:{}};
+  e.flight=fl;
+  e.scores[pid]=e.scores[pid]||Array(18).fill(null);
+  e.scores[pid][S.hole-1]=v;
+  all[me]=e;render();
+  if(!S.demo) queueSave(r.id,me,e);
+}
+document.addEventListener("click",ev=>{
+  const el=ev.target.closest("[data-act]");if(!el)return;
+  const a=el.dataset.act,r=currentRound();
+  if(a==="board"){S.board=el.dataset.k;render()}
+  else if(a==="open"){S.open=S.open===el.dataset.pid?null:el.dataset.pid;render()}
+  else if(a==="demo"){startDemo()}
+  else if(a==="stopdemo"){stopDemo()}
+  else if(a==="hole"){S.hole=Number(el.dataset.h);render();window.scrollTo({top:0})}
+  else if(a==="inc"||a==="dec"||a==="par"){
+    const c=course(r.course),cur=(D().entries[r.id]?.[myId()]?.scores?.[el.dataset.pid]?.[S.hole-1])||0;
+    const par=c.par[S.hole-1];
+    const v=a==="par"||!cur?par:Math.max(1,Math.min(15,cur+(a==="inc"?1:-1)));
+    setScore(el.dataset.pid,v);
+  }
+  else if(a==="planopen"){S.planOpen=S.planOpen===el.dataset.id?null:el.dataset.id;render()}
+  else if(["plansave","plandel","planadd"].includes(a)&&!isAdmin()){toast(ADMIN_ONLY)}
+  else if(a==="plansave"){
+    const id=el.dataset.id,name=$("#pn-"+id).value.trim(),start=$("#ps-"+id).value,end=$("#pe-"+id).value,finales=Math.max(0,parseInt($("#pf-"+id).value)||0);
+    if(!name||!start||!end||end<start){toast("Udfyld navn, og sæt slut efter start");return}
+    savePeriods(periods().map(p=>p.id===id?{...p,id,name,start,end,finales}:p));
+  }
+  else if(a==="plandel"){const id=el.dataset.id;S.planOpen=null;savePeriods(periods().filter(p=>p.id!==id))}
+  else if(a==="planadd"){const y=new Date().getFullYear()+1,id="p"+newId();S.planOpen=id;savePeriods(periods().concat([{id,name:"Ny sæson",start:y+"-04-01",end:y+"-06-30",finales:2}]))}
+  else if(a==="sign"){const me=myId();if(!me)return;safe(()=>put(`signups/${el.dataset.day}/entries/${me}`,{guest:false,at:Date.now()}),"Du er tilmeldt")}
+  else if(a==="unsign"){
+    const day=el.dataset.day,id=el.dataset.id,e=(D().signups?.[day]||{})[id];
+    if(!isAdmin()&&!(e&&((!e.guest&&id===myId())||(e.guest&&e.by===myId())))){toast("Du kan kun afmelde dig selv og dine egne gæster.");return}
+    safe(()=>del(`signups/${day}/entries/${id}`),id===myId()?"Du er afmeldt":"Fjernet");
+  }
+  else if(a==="addguest"){
+    const day=el.dataset.day,me=myId(),info=signupInfo(day);
+    if(!info.open&&!isAdmin()){toast("Gæster kan først tilføjes fra søndag kl. 15.");return}
+    if(!info.free){toast("Der er ingen ledige gæstepladser.");return}
+    if(!me&&!isAdmin()){toast("Vælg dit navn først.");return}
+    const name=$("#gn-"+day).value.trim(),hi=parseFloat(($("#gh-"+day).value||"").replace(",","."));
+    if(!name){toast("Skriv gæstens navn");return}
+    safe(()=>put(`signups/${day}/entries/g-${newId()}`,{guest:true,name,hi:isNaN(hi)?null:hi,by:me||"admin",at:Date.now()}),name+" er tilføjet som gæst");
+  }
+  else if(a==="authtab"){S.authTab=el.dataset.k;render()}
+  else if(a==="register"){ev.preventDefault();doRegister()}
+  else if(a==="login"){ev.preventDefault();doLogin()}
+  else if(a==="changepw"){doChangePw()}
+  else if(a==="claim"){doClaim()}
+  else if(a==="skipauth"){S.skipAuth=true;render()}
+  else if(a==="resetlogin"){if(!isAdmin()){toast(ADMIN_ONLY);return}const pid=el.dataset.pid;safe(()=>S.demo?Promise.resolve():S.db.doc("logins/"+pid).delete(),pname(pid)+" kan nu oprette login igen")}
+  else if(a==="logout"){S.authTab="login";if(S.demo){S.meDemo=null;render()}else{SB.auth.signOut().then(()=>{S.user=null;S.me=null;render()})}}
+  else if(a==="role"){S.asPlayer=!S.asPlayer;S.draft=null;S.confirmEnd=false;render()}
+  else if(["savecfg","addplayer","shuffle","start","askend","end","reopen"].includes(a)&&!isAdmin()){toast(ADMIN_ONLY)}
+  else if(a==="savecfg"){
+    const scale=$("#cfg-scale").value.split(/[;,\s]+/).map(x=>parseFloat(x.replace(",","."))).filter(x=>!isNaN(x));
+    const bestOf=parseInt($("#cfg-best").value)||0,finaleMult=parseFloat($("#cfg-mult").value.replace(",","."))||1;
+    if(!scale.length){toast("Skriv mindst ét pointtal");return}
+    const mode=$("#cfg-mode").value;
+    safe(()=>put("config/season",{mode,scale,bestOf,finaleMult}),"Pointmodellen er gemt");
+  }
+  else if(a==="addplayer"){
+    const name=$("#np-name").value.trim(),hi=parseFloat($("#np-hi").value.replace(",","."));
+    if(!name){toast("Skriv et navn");return}
+    if(isNaN(hi)){toast("Skriv et handicap, fx 18,4");return}
+    if(Object.values(D().players).some(p=>p.name.trim().toLowerCase()===name.toLowerCase())){toast(name+" findes allerede på spillerlisten","err");return}
+    const id=newId();safe(async()=>{await put("players/"+id,{name,hi,active:true});$("#np-name").value="";$("#np-hi").value=""},name+" er tilføjet. Spilleren står nu under Spillere.");
+  }
+  else if(a==="quickshuffle"){
+    if(!isAdmin()){toast(ADMIN_ONLY,"err");return}
+    if(!S.draft){const day=openTuesdays()[0]||nextTuesday();S.draft={date:day,course:courseFor(day)||"old",match:"stb",counts:true,sel:draftSel(day),flights:null}}
+    const d=S.draft,ids=Object.keys(d.sel).filter(k=>d.sel[k]);
+    d.flights=makeFlights(ids,pairHistory(d.date));render();
+    toast(`${ids.length} spillere er fordelt i ${Math.max(...Object.values(d.flights))} bolde`,"ok");
+    setTimeout(()=>document.querySelector(".flights .flight")?.scrollIntoView({behavior:"smooth",block:"start"}),50);
+  }
+  else if(a==="gobolde"){S.draft=null;const day=el.dataset.day;S.draft={date:day,course:courseFor(day)||"old",match:"stb",counts:true,sel:draftSel(day),flights:null};S.forceView="runde";try{history.replaceState(null,"","#runde")}catch(e){}render();window.scrollTo(0,0)}
+  else if(a==="shuffle"){
+    const d=S.draft,ids=Object.keys(d.sel).filter(k=>d.sel[k]);
+    d.flights=makeFlights(ids,pairHistory(d.date));render();
+  }
+  else if(a==="start"){
+    const d=S.draft,ids=Object.keys(d.sel).filter(k=>d.sel[k]&&d.flights?.[k]);
+    let rid=d.date;while(D().rounds[rid])rid=d.date+"-"+(Number(rid.split("-")[3]||1)+1);
+    const gs=signupInfo(d.date).guests.filter(g=>ids.includes(g.id));
+    const hcp={};ids.forEach(p=>hcp[p]=D().players[p]?.hi??gs.find(g=>g.id===p)?.hi??0);
+    const tees={};ids.forEach(p=>tees[p]=D().players[p]?.tee?.[d.course]||d.tee||course(d.course).defaultTee);
+    const flights={};ids.forEach(p=>flights[p]=d.flights[p]);
+    S.draft=null;
+    safe(async()=>{for(const g of gs) await put("players/"+g.id,{name:g.name,hi:g.hi,guest:true,active:false});
+      await put("rounds/"+rid,{date:d.date,course:d.course,status:"live",tee:d.tee||course(d.course).defaultTee,tees,match:d.match,counts:d.counts,players:ids,flights,hcp,created:Date.now()})},"Runden er startet").then(()=>{location.hash="#live"});
+  }
+  else if(a==="askend"){S.confirmEnd=true;render()}
+  else if(a==="noend"){S.confirmEnd=false;render()}
+  else if(a==="end"&&r.imported){S.confirmEnd=false;safe(()=>put("rounds/"+r.id,{status:"done"},true),"Runden er afsluttet")}
+  else if(a==="end"){
+    const results={};(r.players||[]).forEach(p=>{const t=playerTotals(r,p);results[p]={stb:t.stb,gross:t.gross,toPar:t.toPar,netToPar:t.netToPar,holes:t.thru,ph:t.ph}});
+    S.confirmEnd=false;safe(()=>put("rounds/"+r.id,{status:"done",results},true),"Runden er afsluttet");
+  }
+  else if(a==="reopen"){safe(()=>put("rounds/"+r.id,{status:"live"},true),"Runden er genåbnet")}
+});
+document.addEventListener("change",ev=>{
+  const el=ev.target;
+  if(el.id==="me-sel"){if(!el.value)return;if(S.demo)S.meDemo=el.value;else{S.me=el.value;lsSet("tg-me",el.value)}S.hole=1;render()}
+  else if(el.id==="act-sel"){if(!isAdmin())return;if(S.demo)S.meDemo=el.value;else S.me=el.value;S.hole=1;render()}
+  else if((el.id||"").startsWith("hi-")||(el.id||"").startsWith("name-")){
+    if(!isAdmin()&&el.dataset.pid!==myId()){toast("Du kan kun rette dine egne data.");render();return}
+  }
+  if(el.id&&el.id.startsWith("name-")){
+    const name=el.value.trim();if(!name){toast("Navnet må ikke være tomt");render();return}
+    safe(()=>put("players/"+el.dataset.pid,{name},true),"Navn opdateret");
+  }
+  else if(el.id&&el.id.startsWith("hi-")){
+    const hi=parseFloat(el.value.replace(",","."));if(isNaN(hi)){toast("Handicap skal være et tal");return}
+    safe(()=>put("players/"+el.dataset.pid,{hi},true),"Handicap opdateret");
+  }
+  else if(el.id==="nr-date"){S.draft.date=el.value;S.draft.course=courseFor(el.value)||S.draft.course;S.draft.sel=draftSel(el.value);S.draft.flights=null;render()}
+  else if((el.id||"").startsWith("as-")){if(!isAdmin()||!el.value)return;const day=el.id.slice(3);safe(()=>put(`signups/${day}/entries/${el.value}`,{guest:false,at:Date.now()}),pname(el.value)+" er tilmeldt")}
+  else if(el.id==="nr-course"){S.draft.course=el.value;S.draft.tee=null;render()}
+  else if(el.id==="nr-match"){S.draft.match=el.value}
+  else if(el.id==="nr-tee"){S.draft.tee=el.value}
+  else if(el.id==="my-tee"){const r=currentRound(),me=myId();if(!r||!me)return;safe(()=>put("rounds/"+r.id,{tees:{...(r.tees||{}),[me]:el.value}},true),"Tee gemt for i dag")}
+  else if((el.id||"").startsWith("pt-")){const me=myId(),cid=el.dataset.c;if(!me)return;safe(()=>put("players/"+me,{tee:{...(D().players[me]?.tee||{}),[cid]:el.value}},true),"Standard-tee gemt")}
+  else if(el.id==="nr-counts"){S.draft.counts=el.checked}
+  else if(el.id==="per-sel"){S.period=el.value;render()}
+  else if((el.id||"").startsWith("sc-")){
+    if(!isAdmin())return;const day=el.id.slice(3);const dates={...(D().config?.schedule?.dates||{})};
+    if(el.value)dates[day]=el.value;else delete dates[day];
+    safe(()=>put("config/schedule",{dates}),"Bane gemt");
+  }
+  else if((el.id||"").startsWith("df-")){if(!isAdmin())return;S.draft.flights[el.dataset.pid]=Number(el.value);render()}
+  else if(el.id&&el.id.startsWith("sel-")){S.draft.sel[el.dataset.pid]=el.checked;S.draft.flights=null;render()}
+  else if(el.dataset.act==="moveflight"){
+    if(!isAdmin()){toast(ADMIN_ONLY);return}
+    const r=currentRound(),flights={...r.flights,[el.dataset.pid]:Number(el.value)};
+    safe(()=>put("rounds/"+r.id,{flights},true));
+  }
+});
+document.addEventListener("submit",ev=>{ev.preventDefault();if(S.authTab==="reg")doRegister();else doLogin()});
+document.addEventListener("keydown",ev=>{if((ev.key==="Enter"||ev.key===" ")&&ev.target.dataset?.act==="par"){ev.preventDefault();ev.target.click()}});
+window.addEventListener("hashchange",()=>{S.forceView=null;render()});
+// Faneblade virker også, hvis appen ikke må ændre adresselinjen (fx i Claude-appen på iPhone)
+document.addEventListener("click",ev=>{const a=ev.target.closest('#tabs a,a[href^="#"]');if(!a||a.closest("[data-act]"))return;const v=a.getAttribute("href").slice(1);if(!v)return;ev.preventDefault();S.forceView=v;try{history.replaceState(null,"","#"+v)}catch(e){}render();window.scrollTo(0,0)},true);
+document.addEventListener("toggle",ev=>{if(ev.target.id==="selbox")S.selOpen=ev.target.open},true);
+
+
+/* ---------- Supabase ---------- */
+// Alt ligger i én tabel "docs" (path, data). Adgangsregler håndhæves i databasen (row level security).
+let SB=null;
+function makeDb(sb){
+  const cache=new Map(),listeners=new Set();let loaded=false,fireT=null;
+  const collOf=p=>p.slice(0,p.lastIndexOf("/"));
+  const fire=()=>{if(fireT)return;fireT=setTimeout(()=>{fireT=null;listeners.forEach(l=>l.fire())},30)};
+  const snap=c=>({metadata:{fromCache:false},docs:[...cache].filter(([p])=>collOf(p)===c).map(([p,d])=>({id:p.slice(p.lastIndexOf("/")+1),data:()=>d}))});
+  async function loadAll(){
+    const m=new Map();
+    for(let from=0;;from+=1000){
+      const {data,error}=await sb.from("docs").select("path,data").order("path").range(from,from+999);
+      if(error)throw error;data.forEach(r=>m.set(r.path,r.data));if(data.length<1000)break;
+    }
+    cache.clear();m.forEach((v,k)=>cache.set(k,v));loaded=true;fire();
+  }
+  const ch=sb.channel("docs").on("postgres_changes",{event:"*",schema:"public",table:"docs"},pl=>{
+    if(pl.eventType==="DELETE")cache.delete(pl.old.path);else cache.set(pl.new.path,pl.new.data);fire();
+  }).subscribe(st=>{if(st==="SUBSCRIBED"&&loaded)loadAll().catch(()=>{})});
+  const chk=({error})=>{if(error)throw {message:error.message.includes("row-level security")?"Du har ikke adgang til at gemme det her":error.message,code:error.code}};
+  return {
+    loadAll,
+    doc:path=>({
+      set:async d=>{chk(await sb.from("docs").upsert({path,data:d}));cache.set(path,d);fire()},
+      update:async d=>{const {data,error}=await sb.rpc("patch_doc",{p_path:path,p_patch:d});chk({error});cache.set(path,data);fire()},
+      delete:async()=>{chk(await sb.from("docs").delete().eq("path",path));cache.delete(path);fire()}
+    }),
+    collection:c=>({onSnapshot:(cb,err)=>{const l={fire:()=>{try{cb(snap(c))}catch(e){console.error(e)}}};listeners.add(l);if(loaded)l.fire();return ()=>listeners.delete(l)}})
+  };
+}
+
+/* ---------- Start ---------- */
+(async()=>{
+  render();
+  const cfg=window.TK_CONFIG||{};
+  if(!window.supabase||!cfg.url||!cfg.anonKey){S.mode="nodb";startDemo();return}
+  SB=window.supabase.createClient(cfg.url,cfg.anonKey,{auth:{persistSession:true,autoRefreshToken:true}});
+  const db=makeDb(SB);
+  const start=async()=>{
+    if(S.db)return db.loadAll().catch(()=>{});
+    S.db=db;subscribe();
+    try{await db.loadAll()}catch(e){S.stale=true;render()}
+  };
+  const {data:{session}}=await SB.auth.getSession();
+  S.user=session?.user||null;
+  SB.auth.onAuthStateChange((ev,ses)=>{const u=ses?.user||null;const changed=(u?.id||null)!==(S.user?.id||null);S.user=u;if(u&&changed)start();render()});
+  if(S.user)await start();else{S.mode="live";render()}
+})();
+</script>
+
+</body></html>
