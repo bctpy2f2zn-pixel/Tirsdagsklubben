@@ -173,7 +173,7 @@ button.sm{min-height:32px;padding:4px 10px;font-size:13px}
 <div id="banner"></div>
 <main class="wrap" id="view"><div class="card empty"><p class="muted">Henter runder…</p></div></main>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 52</p>
+<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 53</p>
 
 <script>
 /* ---------- Konfiguration (let at justere) ---------- */
@@ -918,7 +918,7 @@ function vEnter(){
       ${mineOk?`<span class="chip">Du har godkendt</span>`:`<button class="primary" data-act="approve" ${st.ready?"":"disabled"}>Godkend scorekort</button>`}</div>`})()}
     ${(()=>{const other=mk.find(b=>b!==me);if(!other)return mk.length<needM?`<div class="card"><h3>Skift markør</h3><p class="small muted" style="margin:0">Du er eneste markør lige nu. En anden i bolden kan trykke "Jeg er markør" under Indtast. De huller, du har tastet, bliver fyldt ud hos dem, så de bare skal tjekke dem.</p></div>`:"";
       return `<div class="card"><h3>Skift markør</h3>${S.swapAsk?`<p class="small" style="margin:0 0 10px">Er ${esc(pname(other))} gået hjem? Så tæller ${esc(pname(other))}s tal ikke længere, og en anden i bolden kan blive markør i stedet.</p><div class="row"><button class="primary" data-act="swapmarker">Ja, skift markør</button><button class="ghost" data-act="swapask">Annuller</button></div>`:`<p class="small muted" style="margin:0 0 10px">Hvis ${esc(pname(other))} må gå hjem under runden, kan en anden i bolden overtage som markør.</p><button data-act="swapask">Skift markør</button>`}</div>`})()}
-    <div class="card"><label class="f">Din tee i dag<select id="my-tee">${Object.entries(c.tees||{}).map(([t,v])=>`<option value="${t}" ${t===teeOf(r,me)?"selected":""}>${t} (CR ${String(v.cr).replace(".",",")} / slope ${v.slope})</option>`).join("")}</select></label>${picker}<p class="note">Bold ${fl} · ${esc(c.name)}. Du kan kun taste for din egen bold. Tryk på tallet for at sætte par.</p></div>`;
+    <div class="card"><h3>Tee i dag for bolden</h3><p class="small muted" style="margin:0 0 8px">Som markør kan du rette tee for alle i bolden.</p>${mates.map(p=>`<label class="f">${esc(pname(p))}${p===me?" (dig)":""}<select class="mate-tee" data-pid="${p}">${Object.entries(c.tees||{}).map(([t,v])=>`<option value="${t}" ${t===teeOf(r,p)?"selected":""}>${t} (CR ${String(v.cr).replace(".",",")} / slope ${v.slope})</option>`).join("")}</select></label>`).join("")}${picker}<p class="note">Bold ${fl} · ${esc(c.name)}. Du kan kun taste for din egen bold. Tryk på tallet for at sætte par.</p></div>`;
 }
 
 function vSeason(){
@@ -1477,6 +1477,9 @@ document.addEventListener("change",ev=>{
     const day=S.draft.date;if(isAdmin()&&!tripOf(day)&&courseFor(day)!==el.value){const sch=D().config?.schedule||{};safe(()=>put("config/schedule",{...sch,dates:{...(sch.dates||{}),[day]:el.value}}),"Bane gemt for "+fmtDate(day))}}
   else if(el.id==="nr-match"){S.draft.match=el.value}
   else if(el.id==="nr-tee"){S.draft.tee=el.value}
+  else if(el.classList?.contains("mate-tee")){const r=currentRound(),me=myId(),pid=el.dataset.pid;if(!r||!me)return;
+    if(!isAdmin()&&!(markersOf(r,r.flights?.[me]).includes(me)&&r.flights?.[pid]===r.flights?.[me])){toast("Kun markørerne i bolden kan rette tee for andre.","err");render();return}
+    safe(()=>put("rounds/"+r.id,{tees:{...(r.tees||{}),[pid]:el.value}},true),"Tee gemt for "+pname(pid))}
   else if(el.id==="my-tee"){const r=currentRound(),me=myId();if(!r||!me)return;safe(()=>put("rounds/"+r.id,{tees:{...(r.tees||{}),[me]:el.value}},true),"Tee gemt for i dag")}
   else if((el.id||"").startsWith("pt-")){const me=myId(),cid=el.dataset.c;if(!me)return;safe(()=>put("players/"+me,{tee:{...(D().players[me]?.tee||{}),[cid]:el.value}},true),"Standard-tee gemt")}
   else if(el.id==="nr-counts"){S.draft.counts=el.checked}
