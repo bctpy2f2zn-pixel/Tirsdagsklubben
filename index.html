@@ -179,7 +179,7 @@ button.sm{min-height:32px;padding:4px 10px;font-size:13px}
 <div id="banner"></div>
 <main class="wrap" id="view"><div class="card empty"><p class="muted">Henter runder…</p></div></main>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 55</p>
+<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 56</p>
 
 <script>
 /* ---------- Konfiguration (let at justere) ---------- */
@@ -784,7 +784,13 @@ function scorecard(r,t){
   <p class="note" style="margin:8px 2px 0">HCP ${t.hi==null?"–":String(t.hi).replace(".",",")} · spillehandicap ${t.ph} · ${t.stb} stableford-point · brutto ${t.gross||"–"} (${fmtPar(t.toPar)}) · netto ${fmtPar(t.netToPar)}${t.unconf?` · ${t.unconf} hul kun tastet af én`:""}</p></div>`;
 }
 
-function vLive(){
+// Dato og bane øverst under Live og Indtast
+function roundBar(){const r=currentRound();if(!r)return "";const day=(r.date||r.id).slice(0,10),t=r.trip?tripById(r.trip):null,st=r.start||startFor(day);
+  const dt=new Date(day+"T12:00:00").toLocaleDateString("da-DK",{weekday:"long",day:"numeric",month:"long"}).replace(/^./,c=>c.toUpperCase());
+  return `<div class="card roundbar" style="padding:12px 16px"><div style="font-family:var(--display);font-weight:700;font-size:22px">${esc(dt)}</div><div class="muted">${t?esc(t.name)+" · ":""}${esc(course(r.course).name)}${st?" · første start kl. "+esc(st):""}${r.status&&r.status!=="live"?" · afsluttet":""}</div></div>`}
+function vLive(){const h=vLive0();return currentRound()?roundBar()+h:h}
+function vEnter(){const h=vEnter0();return currentRound()?.status==="live"?roundBar()+h:h}
+function vLive0(){
   const r=currentRound();
   if(!r&&S.watch) return emptyCard("Ingen runde lige nu","Når Tirsdagsklubben spiller, kan du følge stillingen her.","");
   if(!r) return emptyCard("Ingen runder endnu","Når en runde er startet under Runde, vises stillingen her og opdaterer sig selv, mens der tastes ude på banen.",`<a class="btn" href="#runde">Start en runde</a>${demoBtn()}`)+pushCard();
@@ -865,7 +871,7 @@ function birdieCard(r){
   if(!bs.length)return "";
   return `<div class="card"><h2>Dagens birdies</h2><ul style="margin:6px 0 0;padding-left:20px">${bs.map(b=>`<li>${esc(pname(b.pid))}: ${birdieWord(b.v,b.d)} på hul ${b.h+1} (${b.v} på par ${b.v-b.d})</li>`).join("")}</ul></div>`;
 }
-function vEnter(){
+function vEnter0(){
   const r=currentRound();
   if(!r||r.status!=="live") return emptyCard("Ingen aktiv runde","Scorer kan tastes, når en runde er startet under Runde.",`<a class="btn" href="#runde">Gå til Runde</a>${demoBtn()}`);
   const me=myId();
