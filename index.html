@@ -172,7 +172,7 @@ button.sm{min-height:32px;padding:4px 10px;font-size:13px}
 <div id="banner"></div>
 <main class="wrap" id="view"><div class="card empty"><p class="muted">Henter runder…</p></div></main>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 40</p>
+<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 41</p>
 
 <script>
 /* ---------- Konfiguration (let at justere) ---------- */
@@ -638,7 +638,8 @@ function vSignup(){
     else gst=`<div class="row" style="margin-top:8px"><label class="f" style="flex:1 1 140px">Gæstens navn<input id="gn-${day}" autocomplete="off" list="gl-${day}" placeholder="Skriv eller vælg"></label><datalist id="gl-${day}">${savedGuests().map(g=>`<option value="${esc(g.name)}">`).join("")}</datalist><label class="f">Handicap<input id="gh-${day}" inputmode="decimal" style="width:80px"></label><button data-act="addguest" data-day="${day}" style="align-self:end">Tilføj gæst</button></div><p class="note">${free} ${free===1?"ledig gæsteplads":"ledige gæstepladser"}.</p>`;
     return `<div class="card">
       <div class="row"><div><h2>${esc(fmtDate(day))}</h2><div class="small muted">${courseFor(day)?esc(course(courseFor(day)).name)+" · ":""}${isFinale({id:day})?"Finale · ":""}${ms.length} tilmeldt${guests.length?` · ${guests.length} ${guests.length===1?"gæst":"gæster"}`:""} · ${Math.ceil(n/4)||0} ${Math.ceil(n/4)===1?"bold":"bolde"}</div></div><span class="spacer"></span>
-      ${me?(isIn?`<button class="sm" data-act="ics" data-day="${day}">📅 Læg i kalender</button><button data-act="unsign" data-day="${day}" data-id="${me}">Afmeld mig</button>`:`<button class="primary" data-act="sign" data-day="${day}">Tilmeld mig</button>`):""}</div>
+      ${me?(isIn?`<button data-act="unsign" data-day="${day}" data-id="${me}">Afmeld mig</button>`:`<button class="primary" data-act="sign" data-day="${day}">Tilmeld mig</button>`):""}</div>
+      ${isIn?calRow(day):""}
       ${n?`<ol class="signlist">${list}</ol>`:`<p class="muted">Ingen tilmeldte endnu.</p>`}
       ${adm&&n>=2?`<div class="row" style="margin-bottom:8px"><button class="primary" data-act="gobolde" data-day="${day}">Lav bolde for denne dag</button></div>`:""}
       ${adm?`<div class="row"><select id="as-${day}" aria-label="Tilmeld medlem"><option value="">Tilmeld et medlem…</option>${members.filter(p=>!ms.some(e=>e.id===p.id)).map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join("")}</select></div>`:""}
@@ -666,11 +667,23 @@ function icsFor(key){
     :["BEGIN:VEVENT",uid(key),stamp,"DTSTART;VALUE=DATE:"+d(start),"DTEND;VALUE=DATE:"+d(next(end)),"SUMMARY:"+e(title),loc?"LOCATION:"+e(loc):"",desc,"END:VEVENT"];
   return ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Tirsdagsklubben//DA","CALSCALE:GREGORIAN",...ev,"END:VCALENDAR"].filter(Boolean).join("\r\n");
 }
+// Filen hentes fra edge-funktionen "ics" (en rigtig webadresse), så både iPhone og Android åbner kalenderen.
 function downloadIcs(key){
-  const txt=icsFor(key),name="tirsdagsklubben-"+key+".ics";
-  // iPhone: Safari viser selv "Føj til kalender", når den åbner en kalenderfil
-  if(/iPhone|iPad|iPod/.test(navigator.userAgent)){location.href="data:text/calendar;charset=utf-8,"+encodeURIComponent(txt);return}
-  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([txt],{type:"text/calendar"}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);
+  const txt=icsFor(key),b=new TextEncoder().encode(txt);let bin="";b.forEach(x=>bin+=String.fromCharCode(x));
+  const d=btoa(bin).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+  const url=(window.TK_CONFIG?.url||"")+"/functions/v1/ics?n=tirsdagsklubben-"+encodeURIComponent(key)+"&d="+d;
+  const a=document.createElement("a");a.href=url;a.target="_blank";a.rel="noopener";document.body.appendChild(a);a.click();setTimeout(()=>a.remove(),1000);
+  calMark(key);S.calAsk=null;render();
+  toast("📅 Kalenderen åbner nu. Tryk Tilføj (iPhone) eller Gem (Android) for at gemme aftalen.","ok");
+}
+// Husk på denne telefon, hvilke dage der er lagt i kalenderen
+function calDone(){try{return JSON.parse(lsGet("tk-cal")||"[]")}catch(e){return []}}
+function calMark(k){const a=calDone();if(!a.includes(k)){a.push(k);lsSet("tk-cal",JSON.stringify(a.slice(-60)))}}
+function calRow(key){
+  if(S.calAsk===key)return `<div style="margin:8px 0;padding:10px 12px;border-radius:10px;background:var(--soft);border:2px solid var(--ok)"><strong>✓ Du er tilmeldt.</strong> Vil du have den i din kalender?
+    <div class="row" style="margin-top:8px"><button class="primary sm" data-act="ics" data-day="${key}">📅 Læg i kalender</button><button class="ghost sm" data-act="calno">Nej tak</button></div></div>`;
+  return calDone().includes(key)?`<p class="small" style="margin:6px 0"><span class="chip">✓ Lagt i kalender</span> <button class="ghost sm" data-act="ics" data-day="${key}">Igen</button></p>`
+    :`<p style="margin:6px 0"><button class="ghost sm" data-act="ics" data-day="${key}">📅 Læg i kalender</button></p>`;
 }
 function upcomingTrips(){const today=localIso(new Date());return trips().filter(t=>t.end>=today)}
 function vEvents(){
@@ -685,7 +698,8 @@ function vEvents(){
     const list=ms.map(e=>`<li><span>${esc(pname(e.id))}${e.id===me?" (dig)":""}</span>${rm(e)}</li>`).join("")+gs.map(e=>`<li><span>${esc(e.name)} <span class="muted small">gæst af ${esc(pname(e.by))}${e.hi!=null?", hcp "+String(e.hi).replace(".",","):""}</span></span>${rm(e)}</li>`).join("");
     return `<div class="card">
       <div class="row"><div><h2>${esc(t.name)}</h2><div class="small muted">${esc(fmtS(t.start))}${t.end!==t.start?" til "+esc(fmtS(t.end)):""}${t.times?.[t.start]?" · første start kl. "+esc(t.times[t.start]):""}${cs?" · "+cs:""} · ${ms.length} tilmeldt${gs.length?` · ${gs.length} ${gs.length===1?"gæst":"gæster"}`:""}</div></div><span class="spacer"></span>
-      ${me&&!D().players[me]?.guest?(isIn?`<button class="sm" data-act="ics" data-day="${id}">📅 Læg i kalender</button><button data-act="unsign" data-day="${id}" data-id="${me}">Afmeld mig</button>`:`<button class="primary" data-act="sign" data-day="${id}">Tilmeld mig</button>`):""}</div>
+      ${me&&!D().players[me]?.guest?(isIn?`<button data-act="unsign" data-day="${id}" data-id="${me}">Afmeld mig</button>`:`<button class="primary" data-act="sign" data-day="${id}">Tilmeld mig</button>`):""}</div>
+      ${isIn?calRow(id):""}
       ${all.length?`<ol class="signlist">${list}</ol>`:`<p class="muted">Ingen tilmeldte endnu.</p>`}
       ${adm?`<div class="row"><select id="as-${id}" aria-label="Tilmeld medlem"><option value="">Tilmeld et medlem…</option>${members.filter(p=>!ms.some(e=>e.id===p.id)).map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join("")}</select></div>`:""}
       ${me||adm?`<div class="row" style="margin-top:8px"><label class="f" style="flex:1 1 140px">Gæstens navn<input id="gn-${id}" autocomplete="off" list="gl-${id}" placeholder="Skriv eller vælg"></label><datalist id="gl-${id}">${savedGuests().map(g=>`<option value="${esc(g.name)}">`).join("")}</datalist><label class="f">Handicap<input id="gh-${id}" inputmode="decimal" style="width:80px"></label><button data-act="addguest" data-day="${id}" style="align-self:end">Tilføj gæst</button></div>`:""}
@@ -1218,7 +1232,8 @@ document.addEventListener("click",ev=>{
   else if(a==="plandel"){const id=el.dataset.id;S.planOpen=null;savePeriods(periods().filter(p=>p.id!==id))}
   else if(a==="planadd"){const y=new Date().getFullYear()+1,id="p"+newId();S.planOpen=id;savePeriods(periods().concat([{id,name:"Ny sæson",start:y+"-04-01",end:y+"-06-30",finales:2}]))}
   else if(a==="ics"){downloadIcs(el.dataset.day)}
-  else if(a==="sign"){const me=myId();if(!me)return;if(D().players[me]?.guest){toast("Gæster kan ikke selv tilmelde sig. Et medlem kan tilføje dig som gæst.","err");return}safe(()=>put(`signups/${el.dataset.day}/entries/${me}`,{guest:false,at:Date.now()}),"Du er tilmeldt")}
+  else if(a==="calno"){S.calAsk=null;render()}
+  else if(a==="sign"){const me=myId();if(!me)return;if(D().players[me]?.guest){toast("Gæster kan ikke selv tilmelde sig. Et medlem kan tilføje dig som gæst.","err");return}const k=el.dataset.day;safe(()=>put(`signups/${k}/entries/${me}`,{guest:false,at:Date.now()}).then(()=>{S.calAsk=calDone().includes(k)?null:k;render()}),"Du er tilmeldt")}
   else if(a==="unsign"){
     const day=el.dataset.day,id=el.dataset.id,e=(D().signups?.[day]||{})[id];
     if(!isAdmin()&&!(e&&((!e.guest&&id===myId())||(e.guest&&e.by===myId())))){toast("Du kan kun afmelde dig selv og dine egne gæster.");return}
