@@ -173,7 +173,7 @@ button.sm{min-height:32px;padding:4px 10px;font-size:13px}
 <div id="banner"></div>
 <main class="wrap" id="view"><div class="card empty"><p class="muted">Henter runder…</p></div></main>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 43</p>
+<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 44</p>
 
 <script>
 /* ---------- Konfiguration (let at justere) ---------- */
@@ -524,7 +524,7 @@ const shareText=()=>"Følg Tirsdagsklubben live her: "+watchUrl();
 function shareCard(){
   if(S.demo||S.watch||!myId())return "";
   return `<div class="card"><h3>Gæster kan følge med</h3><p class="small muted" style="margin:0 0 8px">Send linket til gæster. De kan se leaderboardet live uden at logge ind, men kan ikke ændre noget.</p>
-    <div class="row"><a class="btn sm" href="${esc(smsHref("",shareText()))}">📱 Send som SMS</a><button class="ghost sm" data-act="copywatch">Kopier link</button></div></div>`;
+    <div class="row"><a class="btn sm" href="${esc(smsHref("",shareText()))}">📱 Send link som SMS</a></div></div>`;
 }
 
 
