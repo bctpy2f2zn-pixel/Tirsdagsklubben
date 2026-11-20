@@ -171,7 +171,7 @@ button.sm{min-height:32px;padding:4px 10px;font-size:13px}
 <div id="banner"></div>
 <main class="wrap" id="view"><div class="card empty"><p class="muted">Henter runder…</p></div></main>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 28</p>
+<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 29</p>
 
 <script>
 /* ---------- Konfiguration (let at justere) ---------- */
@@ -716,7 +716,7 @@ function vEnter(){
     ${(()=>{const st=flightStatus(r,fl),mineOk=!!mine.approved;
       const who=st.by.length?`Godkendt af ${st.by.map(b=>esc(pname(b))).join(" og ")}.`:"Ingen har godkendt endnu.";
       return `<div class="card ${st.approved?"":""}"><h3>Scorekort for bold ${fl}</h3>
-      <p class="small muted" style="margin:0 0 10px">${st.approved?`<strong style="color:var(--ok,#1f7a4d)">✓ Scorekortet er godkendt.</strong> `:st.ready?"Alle huller er ens hos jer begge. ":"Godkend kan først bruges, når I begge har tastet alle 18 huller, og der ikke er afvigelser. "}${who} Ændrer nogen en score bagefter, skal der godkendes igen.</p>
+      <p class="small muted" style="margin:0 0 10px">${st.approved?`<strong style="color:var(--ok,#1f7a4d)">✓ Scorekortet er godkendt.</strong> `:st.ready?"Alle huller er ens hos de to, der taster. ":"Godkend kan først bruges, når to i bolden har tastet alle 18 huller for alle spillerne, og der ikke er afvigelser. "}${who} Ændrer nogen en score bagefter, skal der godkendes igen.</p>
       ${mineOk?`<span class="chip">Du har godkendt</span>`:`<button class="primary" data-act="approve" ${st.ready?"":"disabled"}>Godkend scorekort</button>`}</div>`})()}
     <div class="card"><label class="f">Din tee i dag<select id="my-tee">${Object.entries(c.tees||{}).map(([t,v])=>`<option value="${t}" ${t===teeOf(r,me)?"selected":""}>${t} (CR ${String(v.cr).replace(".",",")} / slope ${v.slope})</option>`).join("")}</select></label>${picker}<p class="note">Bold ${fl} · ${esc(c.name)}. Du kan kun taste for din egen bold. Tryk på tallet for at sætte par.</p></div>`;
 }
