@@ -156,6 +156,7 @@ button.sm{min-height:32px;padding:4px 10px;font-size:13px}
 .empty p{max-width:46ch;margin:6px auto 14px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);top:calc(110px + env(safe-area-inset-top,0px));background:var(--ok);color:#fff;padding:14px 18px;border-radius:10px;font-size:16px;font-weight:600;z-index:20;width:min(92vw,520px);box-shadow:0 6px 24px rgba(0,0,0,.35);cursor:pointer}
 .toast.err{background:var(--warn)}
+.toast.bird{background:var(--flag);color:#14201a}
 .toast small{display:block;font-weight:400;font-size:13px;opacity:.9;margin-top:2px}
 .note{font-size:13px;color:var(--muted)}
 </style>
@@ -171,7 +172,7 @@ button.sm{min-height:32px;padding:4px 10px;font-size:13px}
 <div id="banner"></div>
 <main class="wrap" id="view"><div class="card empty"><p class="muted">Henter runder…</p></div></main>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 27</p>
+<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 28</p>
 
 <script>
 /* ---------- Konfiguration (let at justere) ---------- */
@@ -207,6 +208,7 @@ function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
 // Beskeder vises øverst. Fejl bliver stående, til man trykker på dem; bekræftelser forsvinder efter 5 sekunder.
 function toast(msg,kind){const t=$("#toast");const err=kind==="err"||(kind!=="ok"&&/^(Kunne ikke|Du har ikke|Du kan kun|Det kan kun|Der er ingen|Gæster kan|Skriv|Vælg|Udfyld|For mange|Forkert|Den |De to|DGU|Fødsels|Handicap|Navnet|Scoren)/.test(msg));
   t.className="toast"+(err?" err":"");t.innerHTML=esc(msg)+(err?"<small>Tryk for at lukke</small>":"");t.hidden=false;clearTimeout(toast.t);if(!err)toast.t=setTimeout(()=>t.hidden=true,5000)}
+function birdieToast(lines){const t=$("#toast");t.className="toast bird";t.innerHTML=lines.map(esc).join("<br>")+"<small>Tryk for at lukke</small>";t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>t.hidden=true,10000);try{navigator.vibrate&&navigator.vibrate([120,60,120])}catch(e){}}
 document.addEventListener("click",ev=>{if(ev.target.closest("#toast"))$("#toast").hidden=true});
 function fmtPar(n){return n===0?"E":(n>0?"+"+n:String(n))}
 function fmtDate(iso){try{return new Date(iso.slice(0,10)+"T12:00:00").toLocaleDateString("da-DK",{weekday:"long",day:"numeric",month:"long"})}catch(e){return iso}}
@@ -279,6 +281,26 @@ function ranked(list,key,dir){
   played.forEach(t=>{t.tie=played.filter(o=>o.pos===t.pos).length>1});
   rest.forEach(t=>t.pos=null);
   return played.concat(rest.sort((a,b)=>pname(a.pid).localeCompare(pname(b.pid))));
+}
+/* ---------- Birdies ---------- */
+// Birdie eller bedre (brutto ift. hullets par). Tæller når hullet er tastet og ikke er en afvigelse.
+// Begge markører taster, men det er samme hul for samme spiller, så der kommer kun én besked.
+function birdieWord(v,d){return v===1?"hole-in-one":d<=-3?"albatros":d===-2?"eagle":"birdie"}
+function birdieList(r){
+  const out=[];
+  (r.players||[]).forEach(pid=>{const c=courseR(r.course,teeOf(r,pid));holeVals(r,pid).forEach((x,h)=>{
+    if(x.st!=="ok"&&x.st!=="one")return;const d=x.v-c.par[h];if(d<=-1)out.push({pid,h,v:x.v,d});
+  })});
+  return out;
+}
+const birdieSeen=new Set();let birdieRid=null;
+function checkBirdies(rid){
+  const r=LIVE.rounds[rid];if(S.demo||!r||r.status!=="live")return;
+  const first=birdieRid!==rid;birdieRid=rid;
+  const fresh=birdieList(r).filter(b=>{const k=b.pid+"/"+b.h;if(birdieSeen.has(k))return false;birdieSeen.add(k);return !first});
+  // Man får ikke besked om sin egen birdie
+  const show=fresh.filter(b=>b.pid!==myId());
+  if(show.length)birdieToast(show.map(b=>`${b.v===1?"🎯":b.d<=-2?"🦅":"🐦"} ${pname(b.pid)} har lavet ${birdieWord(b.v,b.d)} på hul ${b.h+1}`));
 }
 function conflictList(r){
   const out=[];
@@ -407,7 +429,7 @@ function subscribe(){
       if(cur) unsubEntries=db.collection(`rounds/${cur}/entries`).onSnapshot(es=>{
         const m={};es.docs.forEach(d=>m[d.id]=d.data());
         if(pend&&pend.rid===cur) m[pend.me]=pend.entry; // behold egne, ikke-gemte tal
-        LIVE.entries[cur]=m;render();
+        LIVE.entries[cur]=m;render();checkBirdies(cur);
       },fail);
     }
     render();
@@ -659,9 +681,14 @@ function vLive(){
     <div class="row" style="margin-bottom:10px"><div><h2>${r.status==="live"?"Leaderboard":"Resultat"}</h2><div class="small muted">Dagens match: ${MATCH[r.match||"stb"]}${isFinale(r)?" · finale":""}${r.counts===false?" · tæller ikke i sæsonen":""}</div></div><span class="spacer"></span><div class="seg" role="group" aria-label="Spilleform">${seg}</div></div>
     <div class="tbl-wrap"><table class="lb"><colgroup><col style="width:44px"><col><col style="width:48px"><col style="width:64px"></colgroup><thead><tr><th>Pos</th><th>Spiller</th><th class="num">Hul</th><th class="num">${S.board==="stb"?"Point":"Score"}</th></tr></thead><tbody>${rows}</tbody></table></div>
     <p class="note">Tryk på en spiller for at se scorekortet. Huller med afvigelse tæller ikke med, før de er rettet. Lysere tal er kun tastet af én markør.</p>
-  </div>`;
+  </div>${birdieCard(r)}`;
 }
 
+function birdieCard(r){
+  const bs=birdieList(r).sort((a,b)=>a.d-b.d||pname(a.pid).localeCompare(pname(b.pid),"da")||a.h-b.h);
+  if(!bs.length)return "";
+  return `<div class="card"><h2>Dagens birdies</h2><ul style="margin:6px 0 0;padding-left:20px">${bs.map(b=>`<li>${esc(pname(b.pid))}: ${birdieWord(b.v,b.d)} på hul ${b.h+1} (${b.v} på par ${b.v-b.d})</li>`).join("")}</ul></div>`;
+}
 function vEnter(){
   const r=currentRound();
   if(!r||r.status!=="live") return emptyCard("Ingen aktiv runde","Scorer kan tastes, når en runde er startet under Runde.",`<a class="btn" href="#runde">Gå til Runde</a>${demoBtn()}`);
