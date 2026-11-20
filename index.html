@@ -95,10 +95,12 @@ label.f{display:grid;gap:4px;font-size:13px;color:var(--muted)}
 .sc th{font-weight:600;color:var(--muted);font-size:11px}
 .sc td.lbl{width:auto;min-width:46px;text-align:left;padding:0 6px;color:var(--muted);font-weight:600}
 .sc .s{display:inline-flex;width:24px;height:24px;align-items:center;justify-content:center;font-weight:600}
-.sc .birdie{border:1.5px solid var(--under);border-radius:50%;color:var(--under)}
-.sc .eagle{border:1.5px solid var(--under);border-radius:50%;box-shadow:0 0 0 2px var(--surface),0 0 0 3.5px var(--under);color:var(--under)}
-.sc .bogey{border:1.5px solid var(--ink)}
-.sc .dbl{border:1.5px solid var(--ink);box-shadow:0 0 0 2px var(--surface),0 0 0 3.5px var(--ink)}
+/* Birdie gul, eagle dybere gul; bogey lyseblå, dobbelt bogey blå, tripel eller værre mørkeblå */
+.sc .birdie{background:#f7d34a;color:#3d2e00;border-radius:50%}
+.sc .eagle{background:#e9a400;color:#2a1d00;border-radius:50%;box-shadow:0 0 0 2px var(--surface),0 0 0 3.5px #e9a400}
+.sc .bogey{background:#cfe3fb;color:#123a66;border-radius:4px}
+.sc .dbl{background:#5b9be0;color:#fff;border-radius:4px}
+.sc .tpl{background:#1d4f91;color:#fff;border-radius:4px}
 .sc td.c{background:var(--warn-bg);color:var(--warn);font-weight:700}
 .sc td.one{opacity:.55}.sc td.one .s{outline:1.5px dashed currentColor;outline-offset:1px}
 .alert{background:var(--warn-bg);border:1px solid var(--warn);color:var(--warn);border-radius:10px;padding:10px 14px;font-weight:500}
@@ -177,7 +179,7 @@ button.sm{min-height:32px;padding:4px 10px;font-size:13px}
 <div id="banner"></div>
 <main class="wrap" id="view"><div class="card empty"><p class="muted">Henter runder…</p></div></main>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 54</p>
+<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 55</p>
 
 <script>
 /* ---------- Konfiguration (let at justere) ---------- */
@@ -774,7 +776,7 @@ function scorecard(r,t){
       hh+=`<th>${h+1}</th>`;pp+=`<td>${c.par[h]}${s>0?'<sup class="dots">'+"•".repeat(s)+"</sup>":""}</td>`;ps+=c.par[h];
       if(x.st==="conflict"){ss+=`<td class="c" title="Afvigelse: ${x.vals.map(v=>esc(pname(v.by))+" "+v.v).join(", ")}">!</td>`;full=false}
       else if(x.st==="none"){ss+="<td></td>";full=false}
-      else{const d=x.v-c.par[h];const cls=d<=-2?"eagle":d===-1?"birdie":d===1?"bogey":d>=2?"dbl":"";ss+=`<td class="${x.st==="one"?"one":""}"><span class="s ${cls}">${x.v}</span></td>`;gs+=x.v}
+      else{const d=x.v-c.par[h];const cls=d<=-2?"eagle":d===-1?"birdie":d===1?"bogey":d===2?"dbl":d>=3?"tpl":"";ss+=`<td class="${x.st==="one"?"one":""}"><span class="s ${cls}">${x.v}</span></td>`;gs+=x.v}
     }
     return `<tr><td class="lbl">Hul</td>${hh}<th>${a?"Ind":"Ud"}</th></tr><tr><td class="lbl">Par</td>${pp}<td>${ps}</td></tr><tr><td class="lbl">Score</td>${ss}<td><strong>${gs||""}</strong></td></tr>`;
   };
