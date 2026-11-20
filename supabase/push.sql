@@ -26,6 +26,8 @@ alter table public.push_subs enable row level security;
 alter table public.birdie_sent enable row level security;
 alter table public.push_keys enable row level security;
 revoke all on public.push_subs, public.birdie_sent, public.push_keys from anon, authenticated;
+grant select, insert, update, delete on public.push_subs, public.birdie_sent, public.push_keys to service_role;
+grant select on public.docs to service_role;
 
 -- Appen gemmer/fjerner telefonens abonnement for den indloggede spiller
 create or replace function public.save_push(p_sub jsonb) returns void
@@ -60,6 +62,5 @@ begin
   return new;
 end $$;
 revoke execute on function public.birdie_hook() from public, anon, authenticated;
-drop trigger if exists docs_birdie on public.docs;
-create trigger docs_birdie after insert or update on public.docs
+create or replace trigger docs_birdie after insert or update on public.docs
   for each row execute function public.birdie_hook();
