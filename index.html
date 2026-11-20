@@ -179,7 +179,7 @@ button.sm{min-height:32px;padding:4px 10px;font-size:13px}
 <div id="banner"></div>
 <main class="wrap" id="view"><div class="card empty"><p class="muted">Henter runder…</p></div></main>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 59</p>
+<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 60</p>
 
 <script>
 /* ---------- Konfiguration (let at justere) ---------- */
@@ -228,6 +228,8 @@ function defaultPeriods(){
 }
 const periods=()=>((D().config?.periods?.list)||defaultPeriods()).slice().sort((a,b)=>a.start.localeCompare(b.start));
 const periodOf=iso=>periods().find(p=>iso.slice(0,10)>=p.start&&iso.slice(0,10)<=p.end);
+// Sæson der stadig tæller (afsluttede sæsoner som 2026 er låst til regnearket)
+const livePeriodOf=iso=>periods().find(p=>!p.closed&&iso.slice(0,10)>=p.start&&iso.slice(0,10)<=p.end);
 function tuesdaysIn(p){const out=[];const d=new Date(p.start+"T12:00:00");d.setDate(d.getDate()+((2-d.getDay()+7)%7));while(localIso(d)<=p.end){out.push(localIso(d));d.setDate(d.getDate()+7)}return out}
 function isFinale(r){if(r.trip||tripOf(r.id.slice(0,10)))return false;const p=periodOf(r.id);const n=Number(p?.finales??2);if(!p||n<=0)return false;return tuesdaysIn(p).slice(-n).includes(r.id.slice(0,10))}
 const courseFor=day=>D().config?.schedule?.dates?.[day]||null;
@@ -253,7 +255,7 @@ const tripOf=day=>trips().find(t=>day>=t.start&&day<=t.end);
 const tripById=id=>trips().find(t=>t.id===id);
 function daysIn(t){const out=[];const d=new Date(t.start+"T12:00:00");while(localIso(d)<=t.end&&out.length<31){out.push(localIso(d));d.setDate(d.getDate()+1)}return out}
 const dayCourse=day=>tripOf(day)?.days?.[day]||courseFor(day);
-function newDraft(day){return {date:day,course:dayCourse(day)||"old",match:"stb",counts:!tripOf(day),sel:draftSel(day),flights:null}}
+function newDraft(day){return {date:day,course:dayCourse(day)||"old",match:"stb",counts:!tripOf(day)&&!!livePeriodOf(day),sel:draftSel(day),flights:null}}
 const seasonCfg = () => ({...SEASON_DEFAULT, ...(D().config?.season||{})});
 const pname = id => D().players[id]?.name || "Ukendt spiller";
 
@@ -673,7 +675,7 @@ function vSignup(){
     else if(!me&&!adm) gst=`<p class="note">${free} ledige gæstepladser. Vælg dit navn for at tilføje en gæst.</p>`;
     else gst=`<div class="row" style="margin-top:8px"><label class="f" style="flex:1 1 140px">Gæstens navn<input id="gn-${day}" autocomplete="off" list="gl-${day}" placeholder="Skriv eller vælg"></label><datalist id="gl-${day}">${savedGuests().map(g=>`<option value="${esc(g.name)}">`).join("")}</datalist><label class="f">Handicap<input id="gh-${day}" inputmode="decimal" style="width:80px"></label><button data-act="addguest" data-day="${day}" style="align-self:end">Tilføj gæst</button></div><p class="note">${free} ${free===1?"ledig gæsteplads":"ledige gæstepladser"}.</p>`;
     return `<div class="card">
-      <div class="row"><div><h2>${esc(fmtDate(day))}</h2><div class="small muted">${startFor(day)?`<strong>Første start kl. ${esc(startFor(day))}</strong> · `:""}${courseFor(day)?esc(course(courseFor(day)).name)+" · ":""}${isFinale({id:day})?"Finale · ":""}${ms.length} tilmeldt${guests.length?` · ${guests.length} ${guests.length===1?"gæst":"gæster"}`:""} · ${Math.ceil(n/4)||0} ${Math.ceil(n/4)===1?"bold":"bolde"}</div></div><span class="spacer"></span>
+      <div class="row"><div><h2>${esc(fmtDate(day))}</h2><div class="small muted">${startFor(day)?`<strong>Første start kl. ${esc(startFor(day))}</strong> · `:""}${courseFor(day)?esc(course(courseFor(day)).name)+" · ":""}${isFinale({id:day})?"Finale · ":""}${livePeriodOf(day)||tripOf(day)?"":"Uden for sæsonen · "}${ms.length} tilmeldt${guests.length?` · ${guests.length} ${guests.length===1?"gæst":"gæster"}`:""} · ${Math.ceil(n/4)||0} ${Math.ceil(n/4)===1?"bold":"bolde"}</div></div><span class="spacer"></span>
       ${me?(isIn?`<button data-act="unsign" data-day="${day}" data-id="${me}">Afmeld mig</button>`:`<button class="primary" data-act="sign" data-day="${day}">Tilmeld mig</button>`):""}</div>
       ${isIn?calRow(day):""}
       ${n?`<ol class="signlist">${list}</ol>`:`<p class="muted">Ingen tilmeldte endnu.</p>`}
@@ -724,7 +726,9 @@ function calRow(key){
 // Tilmelding: de næste 3 tirsdage + kommende finaletirsdage (så man kan melde sig til finalerne i god tid)
 function signupDays(){const today=localIso(new Date());
   const fin=periods().filter(p=>p.end>=today&&p.end>=APP_START).slice(0,1).flatMap(p=>{const n=Number(p.finales??2);return n>0?tuesdaysIn(p).slice(-n):[]}).filter(d=>d>=today);
-  return [...new Set(openTuesdays().concat(fin))].sort()}
+  // Ekstra dage: datoer hvor der er sat bane eller første start under Runde (fx private runder uden for sæsonen)
+  const sch=D().config?.schedule||{},extra=Object.keys({...(sch.dates||{}),...(sch.times||{})}).filter(d=>d>=today&&!tripOf(d));
+  return [...new Set(openTuesdays().concat(fin,extra))].sort()}
 function upcomingTrips(){const today=localIso(new Date());return trips().filter(t=>t.end>=today)}
 function vEvents(){
   const me=myId(),adm=isAdmin(),ts=upcomingTrips();
