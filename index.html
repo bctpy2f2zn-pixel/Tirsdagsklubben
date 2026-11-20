@@ -172,7 +172,7 @@ button.sm{min-height:32px;padding:4px 10px;font-size:13px}
 <div id="banner"></div>
 <main class="wrap" id="view"><div class="card empty"><p class="muted">Henter runder…</p></div></main>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 35</p>
+<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 36</p>
 
 <script>
 /* ---------- Konfiguration (let at justere) ---------- */
@@ -338,7 +338,7 @@ function conflictList(r){
 // Procentpoint: vinderen spiller om 40 + 5 pr. deltager (12 eller flere = 100, 8 = 80, 4 = 60). Sidst får det halve; jævnt imellem.
 function pctTop(n){return Math.min(100,40+5*n)}
 function pctPts(k,n){const w=pctTop(n);return n>1?w/2+(w/2)*(n-1-k)/(n-1):w}
-const isGuest=pid=>pid.startsWith("g-")||!!D().players[pid]?.guest;
+const isGuest=pid=>D().players[pid]?!!D().players[pid].guest:pid.startsWith("g-");
 // Lige stableford afgøres på de sidste 9, 6, 3 og 1 hul (stableford); derefter uafgjort.
 // Importerede runder (2026) har ikke huldata; der deler man stadig.
 function dayCmp(a,b){
@@ -908,6 +908,7 @@ function vPlan(){
     <div style="display:grid;gap:10px">${items}</div>
     <div class="row" style="margin-top:12px"><button data-act="planadd">Ny sæson</button></div></div>`;
 }
+function kindSel(p){return `<select id="kind-${p.id}" data-pid="${p.id}" aria-label="Medlem eller gæst" style="margin-top:4px;width:100%"><option value="m" ${p.guest?"":"selected"}>Medlem</option><option value="g" ${p.guest?"selected":""}>Gæst</option></select>`}
 // Gæster der er gemt (har spillet før eller er tilføjet af administratoren), nyeste først
 function savedGuests(){return Object.entries(D().players).filter(([id,p])=>p.guest&&!p.hidden&&p.name).map(([id,p])=>({id,name:p.name,hi:p.hi??null,guest:true,at:p.at||0})).sort((a,b)=>a.name.localeCompare(b.name,"da"))}
 /* Ture og andre baner (kun administrator) */
@@ -1008,19 +1009,25 @@ function vPlayers(){
   const count=pid=>Object.values(D().rounds).filter(r=>r.status==="done"&&r.results?.[pid]).length;
   const me=myId(),adm=isAdmin();
   const rows=ps.map(p=>{const ed=adm||p.id===me;const hi=String(p.hi??"").replace(".",",");
-    return `<tr${p.id===me?' style="background:var(--soft)"':""}><td>${ed?`<input id="name-${p.id}" data-pid="${p.id}" value="${esc(p.name)}" style="width:100%;min-width:120px" aria-label="Navn">`:`<strong>${esc(p.name)}</strong>`}</td>
+    return `<tr${p.id===me?' style="background:var(--soft)"':""}><td>${ed?`<input id="name-${p.id}" data-pid="${p.id}" value="${esc(p.name)}" style="width:100%;min-width:120px" aria-label="Navn">${adm?kindSel(p):""}`:`<strong>${esc(p.name)}</strong>`}</td>
     <td>${ed?`<input id="hi-${p.id}" inputmode="decimal" style="width:80px" value="${hi}" placeholder="fx 18,4" data-pid="${p.id}" aria-label="Handicap for ${esc(p.name)}">`:(hi||'<span class="muted">–</span>')}</td>
     <td class="r">${count(p.id)}</td>${adm?`<td>${logins()[p.id]?`<span class="chip">Login</span> <button class="ghost sm" data-act="resetlogin" data-pid="${p.id}">Nulstil</button>`:'<span class="muted small">Ikke oprettet</span>'}</td>`:""}</tr>`}).join("");
   const missing=ps.filter(p=>p.hi==null).length;
-  return `${!me&&!adm?whoCard("Vælg dit navn, så kan du rette dit eget navn og handicap."):""}<div class="card"><h2>Spillere</h2>
+  return `${!me&&!adm?whoCard("Vælg dit navn, så kan du rette dit eget navn og handicap."):""}<div class="card"><h2>Medlemmer</h2>
     <p class="muted small">${adm?"Som administrator kan du rette alle spillere.":"Du kan kun rette dit eget navn og handicap."} Et nyt handicap bruges fra næste runde.</p>${missing?`<p class="chip warn">${missing} spillere mangler handicap</p>`:""}
-    ${ps.length?`<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Navn</th><th>Handicap</th><th class="r">Runder spillet</th>${adm?"<th>Login</th>":""}</tr></thead><tbody>${rows}</tbody></table></div>`:`<p class="muted">Ingen spillere endnu. Tilføj gruppen herunder.</p>`}
+    ${ps.length?`<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Navn</th><th>Handicap</th><th class="r">Runder spillet</th>${adm?"<th>Login</th>":""}</tr></thead><tbody>${rows}</tbody></table></div>`:`<p class="muted">Ingen medlemmer endnu. Tilføj gruppen herunder.</p>`}
   </div>
+  ${(()=>{const gs=savedGuests();if(!gs.length&&!adm)return "";
+    const gr=gs.map(g=>{const p=D().players[g.id];return `<tr><td>${adm?`<input id="name-${g.id}" data-pid="${g.id}" value="${esc(g.name)}" style="width:100%;min-width:120px" aria-label="Navn">${kindSel({...p,id:g.id})}`:`<strong>${esc(g.name)}</strong>`}</td>
+      <td>${adm?`<input id="hi-${g.id}" inputmode="decimal" style="width:80px" value="${String(g.hi??"").replace(".",",")}" data-pid="${g.id}" aria-label="Handicap for ${esc(g.name)}">`:(g.hi!=null?String(g.hi).replace(".",","):'<span class="muted">–</span>')}</td>
+      <td class="r">${count(g.id)}</td></tr>`}).join("");
+    return `<div class="card"><h2>Gæster</h2><p class="muted small">Gæster bliver på listen, så de kan sættes på en runde igen. De tæller ikke i stillingen.${adm?" Bliver en gæst medlem af Tirsdagsklubben, så vælg Medlem under navnet.":""}</p>
+    ${gs.length?`<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Navn</th><th>Handicap</th><th class="r">Runder spillet</th></tr></thead><tbody>${gr}</tbody></table></div>`:`<p class="muted small">Ingen gæster endnu.</p>`}</div>`})()}
   ${me&&D().players[me]?`<div class="card"><h3>Mit teested</h3><p class="small muted" style="margin:0 0 8px">Bruges automatisk, når en runde startes. Du kan også skifte tee på selve dagen under Indtast.</p><div class="row">${myTeeCourses().map(cid=>{const c=course(cid),cur=D().players[me]?.tee?.[cid]||c.defaultTee;return `<label class="f">${esc(c.name)}<select id="pt-${cid}" data-c="${cid}">${Object.entries(c.tees||{}).map(([t,v])=>`<option value="${t}" ${t===cur?"selected":""}>${t} (CR ${String(v.cr).replace(".",",")} / slope ${v.slope})</option>`).join("")}</select></label>`}).join("")}</div></div>`:""}
   ${me&&logins()[me]?`<div class="card"><h3>Skift adgangskode</h3>${logins()[me].changed?"":`<p class="small muted" style="margin:0 0 8px">Din adgangskode er stadig din fødselsdato. Den er let at gætte, så skift den gerne.</p>`}
     <div class="row"><label class="f">Nuværende<input id="cp-old" type="password" autocomplete="current-password" style="width:130px"></label><label class="f">Ny<input id="cp-new" type="password" autocomplete="new-password" style="width:130px"></label><label class="f">Gentag ny<input id="cp-new2" type="password" autocomplete="new-password" style="width:130px"></label><button data-act="changepw" style="align-self:end">Skift</button></div></div>`:""}
   ${adm?`<div class="card"><h3>Tilføj spiller</h3>
-    <div class="row"><label class="f" style="flex:1 1 160px">Navn<input id="np-name" autocomplete="off"></label><label class="f">Handicap<input id="np-hi" inputmode="decimal" style="width:90px"></label><button class="primary" data-act="addplayer" style="align-self:end">Tilføj</button></div>
+    <div class="row"><label class="f" style="flex:1 1 160px">Navn<input id="np-name" autocomplete="off"></label><label class="f">Handicap<input id="np-hi" inputmode="decimal" style="width:90px"></label><label class="f">Status<select id="np-kind"><option value="m">Medlem</option><option value="g">Gæst</option></select></label><button class="primary" data-act="addplayer" style="align-self:end">Tilføj</button></div>
   </div>`:""}`;
 }
 
@@ -1193,7 +1200,7 @@ document.addEventListener("click",ev=>{
     if(!name){toast("Skriv et navn");return}
     if(isNaN(hi)){toast("Skriv et handicap, fx 18,4");return}
     if(Object.values(D().players).some(p=>p.name.trim().toLowerCase()===name.toLowerCase())){toast(name+" findes allerede på spillerlisten","err");return}
-    const id=newId();safe(async()=>{await put("players/"+id,{name,hi,active:true});$("#np-name").value="";$("#np-hi").value=""},name+" er tilføjet. Spilleren står nu under Spillere.");
+    const guest=$("#np-kind")?.value==="g",id=(guest?"g-":"")+newId();safe(async()=>{await put("players/"+id,guest?{name,hi,guest:true,active:false}:{name,hi,active:true});$("#np-name").value="";$("#np-hi").value=""},name+" er tilføjet. Spilleren står nu under Spillere.");
   }
   else if(a==="quickshuffle"){
     if(!isAdmin()){toast(ADMIN_ONLY,"err");return}
@@ -1233,7 +1240,8 @@ document.addEventListener("click",ev=>{
     if(!isAdmin()||!x||x.imported){toast("Denne runde kan ikke slettes.","err");return}
     const pids=new Set([...(x.players||[]),...Object.keys(D().entries[rid]||{})]);
     safe(async()=>{for(const p of pids) await del(`rounds/${rid}/entries/${p}`);
-      for(const p of (x.players||[])) if(p.startsWith("g-")&&D().players[p]?.guest) await del("players/"+p);
+      // Gæsten slettes kun, hvis den ikke har spillet andre runder (ellers bliver den på gæstelisten)
+      for(const p of (x.players||[])) if(p.startsWith("g-")&&D().players[p]?.guest&&!Object.values(D().rounds).some(o=>o.id!==rid&&(o.players||[]).includes(p))) await del("players/"+p);
       await del("rounds/"+rid);delete LIVE.rounds[rid];delete LIVE.entries[rid]},"Runden er slettet");
   }
   else if(a==="bemarker"){
@@ -1297,6 +1305,8 @@ document.addEventListener("change",ev=>{
   else if(el.id==="my-tee"){const r=currentRound(),me=myId();if(!r||!me)return;safe(()=>put("rounds/"+r.id,{tees:{...(r.tees||{}),[me]:el.value}},true),"Tee gemt for i dag")}
   else if((el.id||"").startsWith("pt-")){const me=myId(),cid=el.dataset.c;if(!me)return;safe(()=>put("players/"+me,{tee:{...(D().players[me]?.tee||{}),[cid]:el.value}},true),"Standard-tee gemt")}
   else if(el.id==="nr-counts"){S.draft.counts=el.checked}
+  else if((el.id||"").startsWith("kind-")){if(!isAdmin()){toast(ADMIN_ONLY);render();return}const pid=el.dataset.pid,g=el.value==="g";
+    safe(()=>put("players/"+pid,{guest:g,active:!g},true),pname(pid)+(g?" er nu gæst":" er nu medlem"))}
   else if(el.id==="per-sel"){S.period=el.value;render()}
   else if((el.id||"").startsWith("sc-")){
     if(!isAdmin())return;const day=el.id.slice(3);const dates={...(D().config?.schedule?.dates||{})};
