@@ -172,7 +172,7 @@ button.sm{min-height:32px;padding:4px 10px;font-size:13px}
 <div id="banner"></div>
 <main class="wrap" id="view"><div class="card empty"><p class="muted">Henter runder…</p></div></main>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 36</p>
+<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 37</p>
 
 <script>
 /* ---------- Konfiguration (let at justere) ---------- */
@@ -634,7 +634,7 @@ function vSignup(){
     if(!open) gst=`<p class="note">Gæster kan tilføjes fra ${go.toLocaleDateString("da-DK",{weekday:"long",day:"numeric",month:"long"})} kl. ${GUEST_OPEN.hour}, hvis der er ledige pladser.</p>`;
     else if(!free) gst=`<p class="note">Ingen ledige gæstepladser. Gæster kan kun fylde op, så antallet går op i hele 4-bolde.</p>`;
     else if(!me&&!adm) gst=`<p class="note">${free} ledige gæstepladser. Vælg dit navn for at tilføje en gæst.</p>`;
-    else gst=`<div class="row" style="margin-top:8px"><label class="f" style="flex:1 1 140px">Gæstens navn<input id="gn-${day}" autocomplete="off"></label><label class="f">Handicap<input id="gh-${day}" inputmode="decimal" style="width:80px"></label><button data-act="addguest" data-day="${day}" style="align-self:end">Tilføj gæst</button></div><p class="note">${free} ${free===1?"ledig gæsteplads":"ledige gæstepladser"}.</p>`;
+    else gst=`<div class="row" style="margin-top:8px"><label class="f" style="flex:1 1 140px">Gæstens navn<input id="gn-${day}" autocomplete="off" list="gl-${day}" placeholder="Skriv eller vælg"></label><datalist id="gl-${day}">${savedGuests().map(g=>`<option value="${esc(g.name)}">`).join("")}</datalist><label class="f">Handicap<input id="gh-${day}" inputmode="decimal" style="width:80px"></label><button data-act="addguest" data-day="${day}" style="align-self:end">Tilføj gæst</button></div><p class="note">${free} ${free===1?"ledig gæsteplads":"ledige gæstepladser"}.</p>`;
     return `<div class="card">
       <div class="row"><div><h2>${esc(fmtDate(day))}</h2><div class="small muted">${courseFor(day)?esc(course(courseFor(day)).name)+" · ":""}${isFinale({id:day})?"Finale · ":""}${ms.length} tilmeldt${guests.length?` · ${guests.length} ${guests.length===1?"gæst":"gæster"}`:""} · ${Math.ceil(n/4)||0} ${Math.ceil(n/4)===1?"bold":"bolde"}</div></div><span class="spacer"></span>
       ${me?(isIn?`<button data-act="unsign" data-day="${day}" data-id="${me}">Afmeld mig</button>`:`<button class="primary" data-act="sign" data-day="${day}">Tilmeld mig</button>`):""}</div>
@@ -1163,7 +1163,7 @@ document.addEventListener("click",ev=>{
   }
   else if(a==="plandel"){const id=el.dataset.id;S.planOpen=null;savePeriods(periods().filter(p=>p.id!==id))}
   else if(a==="planadd"){const y=new Date().getFullYear()+1,id="p"+newId();S.planOpen=id;savePeriods(periods().concat([{id,name:"Ny sæson",start:y+"-04-01",end:y+"-06-30",finales:2}]))}
-  else if(a==="sign"){const me=myId();if(!me)return;safe(()=>put(`signups/${el.dataset.day}/entries/${me}`,{guest:false,at:Date.now()}),"Du er tilmeldt")}
+  else if(a==="sign"){const me=myId();if(!me)return;if(D().players[me]?.guest){toast("Gæster kan ikke selv tilmelde sig. Et medlem kan tilføje dig som gæst.","err");return}safe(()=>put(`signups/${el.dataset.day}/entries/${me}`,{guest:false,at:Date.now()}),"Du er tilmeldt")}
   else if(a==="unsign"){
     const day=el.dataset.day,id=el.dataset.id,e=(D().signups?.[day]||{})[id];
     if(!isAdmin()&&!(e&&((!e.guest&&id===myId())||(e.guest&&e.by===myId())))){toast("Du kan kun afmelde dig selv og dine egne gæster.");return}
@@ -1176,7 +1176,12 @@ document.addEventListener("click",ev=>{
     if(!me&&!isAdmin()){toast("Vælg dit navn først.");return}
     const name=$("#gn-"+day).value.trim(),hi=parseFloat(($("#gh-"+day).value||"").replace(",","."));
     if(!name){toast("Skriv gæstens navn");return}
-    safe(()=>put(`signups/${day}/entries/g-${newId()}`,{guest:true,name,hi:isNaN(hi)?null:hi,by:me||"admin",at:Date.now()}),name+" er tilføjet som gæst");
+    // Kendt gæst: brug den gemte gæst (samme id og handicap, hvis der ikke er skrevet et nyt)
+    const old=savedGuests().find(g=>g.name.trim().toLowerCase()===name.toLowerCase());
+    if(Object.values(D().players).some(p=>!p.guest&&p.name.trim().toLowerCase()===name.toLowerCase())){toast(name+" er medlem og skal selv tilmelde sig.","err");return}
+    const gid=old?old.id:"g-"+newId(),ghi=isNaN(hi)?(old?.hi??null):hi;
+    if((D().signups?.[day]||{})[gid]){toast(name+" er allerede tilmeldt","err");return}
+    safe(()=>put(`signups/${day}/entries/${gid}`,{guest:true,name:old?old.name:name,hi:ghi,by:me||"admin",at:Date.now()}),name+" er tilføjet som gæst");
   }
   else if(a==="authtab"){S.authTab=el.dataset.k;render()}
   else if(a==="register"){ev.preventDefault();doRegister()}
