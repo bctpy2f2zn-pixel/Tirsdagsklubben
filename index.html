@@ -173,7 +173,7 @@ button.sm{min-height:32px;padding:4px 10px;font-size:13px}
 <div id="banner"></div>
 <main class="wrap" id="view"><div class="card empty"><p class="muted">Henter runder…</p></div></main>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 44</p>
+<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 45</p>
 
 <script>
 /* ---------- Konfiguration (let at justere) ---------- */
@@ -1022,7 +1022,9 @@ function vCourses(){
   const own=Object.keys(D().courses||{}).filter(id=>!COURSES_DEFAULT[id]&&!course(id).hidden);
   const e=S.ce;
   const list=own.map(id=>{const c=course(id);return `<div class="row" style="justify-content:space-between;margin:4px 0"><span><strong>${esc(c.name)}</strong> <span class="small muted">par ${sum(c.par||[])} · ${Object.keys(c.tees||{}).length} tees${c.provisional?" · foreløbig":""}</span></span><button class="sm" data-act="ceopen" data-id="${id}">Ret</button></div>`}).join("");
-  const grid=(k,lab)=>[0,9].map(o=>`<div style="display:grid;grid-template-columns:52px repeat(9,1fr);gap:3px;margin-bottom:4px;align-items:center"><span class="small muted">${o?"Hul 10-18":"Hul 1-9"}</span>${Array.from({length:9},(_,i)=>`<input id="ce-${k}-${o+i}" inputmode="numeric" aria-label="${lab} hul ${o+i+1}" placeholder="${o+i+1}" value="${esc(e[k][o+i])}" style="width:100%;min-width:0;padding:6px 2px;text-align:center">`).join("")}</div>`).join("");
+  // Par får en sum for ud (1-9), hjem (10-18) og i alt, som opdateres mens man taster
+  const parSum=o=>{const v=e.par.slice(o,o+9).map(x=>parseInt(x)).filter(x=>x>0);return v.length?sum(v):""};
+  const grid=(k,lab)=>[0,9].map(o=>`<div style="display:grid;grid-template-columns:44px repeat(9,1fr)${k==="par"?" 30px":""};gap:3px;margin-bottom:4px;align-items:center"><span class="small muted">${o?"Hul 10-18":"Hul 1-9"}</span>${Array.from({length:9},(_,i)=>`<input id="ce-${k}-${o+i}" inputmode="numeric" aria-label="${lab} hul ${o+i+1}" placeholder="${o+i+1}" value="${esc(e[k][o+i])}" style="width:100%;min-width:0;padding:6px 2px;text-align:center">`).join("")}${k==="par"?`<strong id="ce-sum-${o}" style="text-align:center" title="${o?"Hjem":"Ud"}">${parSum(o)}</strong>`:""}</div>`).join("")+(k==="par"?`<p class="small" style="margin:0;text-align:right">Ud <strong id="ce-sumo">${parSum(0)||"–"}</strong> · Hjem <strong id="ce-sumi">${parSum(9)||"–"}</strong> · Par i alt <strong id="ce-sumt">${(parSum(0)||0)+(parSum(9)||0)||"–"}</strong></p>`:"");
   const form=e?`<div class="flight" style="margin-top:10px">
     <label class="f">Banens navn<input id="ce-name" value="${esc(e.name)}" placeholder="fx Great Northern"></label>
     <h3 style="margin-top:12px">Par pr. hul</h3>${grid("par","Par")}
@@ -1430,6 +1432,10 @@ document.addEventListener("click",ev=>{const a=ev.target.closest('#tabs a,a[href
 document.addEventListener("toggle",ev=>{if(ev.target.id==="selbox")S.selOpen=ev.target.open},true);
 
 
+document.addEventListener("input",ev=>{if(!/^ce-par-/.test(ev.target.id||""))return;
+  const v=o=>{let t=0,n=0;for(let i=o;i<o+9;i++){const x=parseInt($("#ce-par-"+i)?.value);if(x>0){t+=x;n++}}return n?t:""};
+  const a=v(0),b=v(9),set=(id,x)=>{const el=$("#"+id);if(el)el.textContent=x};
+  set("ce-sum-0",a);set("ce-sum-9",b);set("ce-sumo",a||"–");set("ce-sumi",b||"–");set("ce-sumt",(a||0)+(b||0)||"–")});
 /* ---------- Supabase ---------- */
 // Alt ligger i én tabel "docs" (path, data). Adgangsregler håndhæves i databasen (row level security).
 let SB=null;
