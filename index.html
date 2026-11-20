@@ -172,7 +172,7 @@ button.sm{min-height:32px;padding:4px 10px;font-size:13px}
 <div id="banner"></div>
 <main class="wrap" id="view"><div class="card empty"><p class="muted">Henter runder…</p></div></main>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 33</p>
+<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 34</p>
 
 <script>
 /* ---------- Konfiguration (let at justere) ---------- */
@@ -222,7 +222,7 @@ function defaultPeriods(){
 const periods=()=>((D().config?.periods?.list)||defaultPeriods()).slice().sort((a,b)=>a.start.localeCompare(b.start));
 const periodOf=iso=>periods().find(p=>iso.slice(0,10)>=p.start&&iso.slice(0,10)<=p.end);
 function tuesdaysIn(p){const out=[];const d=new Date(p.start+"T12:00:00");d.setDate(d.getDate()+((2-d.getDay()+7)%7));while(localIso(d)<=p.end){out.push(localIso(d));d.setDate(d.getDate()+7)}return out}
-function isFinale(r){const p=periodOf(r.id);const n=Number(p?.finales??2);if(!p||n<=0)return false;return tuesdaysIn(p).slice(-n).includes(r.id.slice(0,10))}
+function isFinale(r){if(r.trip||tripOf(r.id.slice(0,10)))return false;const p=periodOf(r.id);const n=Number(p?.finales??2);if(!p||n<=0)return false;return tuesdaysIn(p).slice(-n).includes(r.id.slice(0,10))}
 const courseFor=day=>D().config?.schedule?.dates?.[day]||null;
 function newId(){return Math.random().toString(36).slice(2,10)}
 
@@ -232,7 +232,18 @@ let DEMO = null;
 const S = {mode:"loading", demo:false, db:null, view:"live", board:"stb", open:null, hole:1,
   me:lsGet("tg-me"), period:null, planOpen:null, draft:null, confirmEnd:false, stale:false};
 const D = () => S.demo ? DEMO : LIVE;
-const course = id => ({...(COURSES_DEFAULT[id]||COURSES_DEFAULT.old), ...(D().courses[id]||{})});
+const course = id => COURSES_DEFAULT[id]?{...COURSES_DEFAULT[id],...(D().courses[id]||{})}
+  :D().courses[id]?{defaultTee:Object.keys(D().courses[id].tees||{})[0],...D().courses[id]}:COURSES_DEFAULT.old;
+// Alle baner: de to faste + dem administratoren har oprettet (courses/<id>). Skjulte baner vises ikke i menuerne.
+const courseIds=()=>[...new Set([...Object.keys(COURSES_DEFAULT),...Object.keys(D().courses||{})])].filter(id=>!course(id).hidden);
+const homeCourse=id=>!!COURSES_DEFAULT[id];
+/* Ture (config/trips): fx en tur til Fyn. Har egne datoer og bane pr. dag og egen stilling (samlet stableford). */
+const trips=()=>((D().config?.trips?.list)||[]).slice().sort((a,b)=>a.start.localeCompare(b.start));
+const tripOf=day=>trips().find(t=>day>=t.start&&day<=t.end);
+const tripById=id=>trips().find(t=>t.id===id);
+function daysIn(t){const out=[];const d=new Date(t.start+"T12:00:00");while(localIso(d)<=t.end&&out.length<31){out.push(localIso(d));d.setDate(d.getDate()+1)}return out}
+const dayCourse=day=>tripOf(day)?.days?.[day]||courseFor(day);
+function newDraft(day){return {date:day,course:dayCourse(day)||"old",match:"stb",counts:!tripOf(day),sel:draftSel(day),flights:null}}
 const seasonCfg = () => ({...SEASON_DEFAULT, ...(D().config?.season||{})});
 const pname = id => D().players[id]?.name || "Ukendt spiller";
 
@@ -350,8 +361,9 @@ function dayPoints(r,cfg){
 }
 // En sæson kan have sine egne regler (per.rules), fx 2026: summen af de 4 bedste stableford-runder.
 function seasonTable(per){
-  const cfg={...seasonCfg(),...(per.rules||{})};
-  const rounds=Object.values(D().rounds).filter(r=>r.status==="done"&&r.results&&r.counts!==false&&r.id.slice(0,10)>=per.start&&r.id.slice(0,10)<=per.end).sort((a,b)=>a.id.localeCompare(b.id));
+  // En tur: alle turens runder tæller, og stillingen er samlet stableford
+  const cfg=per.trip?{...seasonCfg(),mode:"stb",bestOf:0,finaleMult:1}:{...seasonCfg(),...(per.rules||{})};
+  const rounds=Object.values(D().rounds).filter(r=>r.status==="done"&&r.results&&(per.trip?r.trip===per.id:(r.counts!==false&&r.id.slice(0,10)>=per.start&&r.id.slice(0,10)<=per.end))).sort((a,b)=>a.id.localeCompare(b.id));
   const agg={};
   rounds.forEach(r=>Object.entries(dayPoints(r,cfg)).forEach(([pid,v])=>{
     if(D().players[pid]?.guest) return;
@@ -572,7 +584,7 @@ function signupInfo(day){
 /* Bolde: 4- og 3-bolde, så få gentagne makkere i sæsonen som muligt */
 const pairKey=(a,b)=>a<b?a+"|"+b:b+"|"+a;
 function pairHistory(day){
-  const per=periodOf(day),h={};
+  const per=tripOf(day)||periodOf(day),h={};
   Object.values(D().rounds).forEach(r=>{
     const rd=r.id.slice(0,10);if(!r.flights||rd>=day)return;if(per&&(rd<per.start||rd>per.end))return;
     const by={};Object.entries(r.flights).forEach(([p,f])=>(by[f]=by[f]||[]).push(p));
@@ -603,7 +615,9 @@ function makeFlights(ids,hist){
 function repeatPairs(fl,hist){let n=0;const by={};Object.entries(fl).forEach(([p,f])=>(by[f]=by[f]||[]).push(p));Object.values(by).forEach(g=>{for(let i=0;i<g.length;i++)for(let j=i+1;j<g.length;j++)if(hist[pairKey(g[i],g[j])])n++});return n}
 function draftSel(day){
   const info=signupInfo(day),sel={};
+  const t=tripOf(day),prev=t&&Object.values(D().rounds).filter(r=>r.trip===t.id&&r.id.slice(0,10)<=day).sort((a,b)=>b.id.localeCompare(a.id))[0];
   if(info.members.length){info.members.forEach(e=>sel[e.id]=true);info.guests.forEach(e=>sel[e.id]=true)}
+  else if(prev)(prev.players||[]).forEach(p=>sel[p]=true);
   else Object.values(D().players).filter(p=>!p.guest).forEach(p=>sel[p.id]=true);
   return sel;
 }
@@ -695,7 +709,7 @@ function vLive(){
   }).join("");
   const seg=[["stb","Stableford"],["gross","Slag brutto"],["net","Slag netto"]].map(([k,l])=>`<button data-act="board" data-k="${k}" aria-pressed="${S.board===k}">${l}</button>`).join("");
   return `${alert}<div class="card">
-    <div class="row" style="margin-bottom:10px"><div><h2>${r.status==="live"?"Leaderboard":"Resultat"}</h2><div class="small muted">Dagens match: ${MATCH[r.match||"stb"]}${isFinale(r)?" · finale":""}${r.counts===false?" · tæller ikke i sæsonen":""}</div></div><span class="spacer"></span><div class="seg" role="group" aria-label="Spilleform">${seg}</div></div>
+    <div class="row" style="margin-bottom:10px"><div><h2>${r.status==="live"?"Leaderboard":"Resultat"}</h2><div class="small muted">Dagens match: ${MATCH[r.match||"stb"]}${isFinale(r)?" · finale":""}${r.trip&&tripById(r.trip)?" · "+esc(tripById(r.trip).name):r.counts===false?" · tæller ikke i sæsonen":""}</div></div><span class="spacer"></span><div class="seg" role="group" aria-label="Spilleform">${seg}</div></div>
     <div class="tbl-wrap"><table class="lb"><colgroup><col style="width:44px"><col><col style="width:48px"><col style="width:64px"></colgroup><thead><tr><th>Pos</th><th>Spiller</th><th class="num">Hul</th><th class="num">${S.board==="stb"?"Point":"Score"}</th></tr></thead><tbody>${rows}</tbody></table></div>
     <p class="note">Tryk på en spiller for at se scorekortet. Huller med afvigelse tæller ikke med, før de er rettet. Lysere tal er kun tastet af én markør.</p>
   </div>${birdieCard(r)}${pushCard()}`;
@@ -819,7 +833,9 @@ function vSeason(){
   const ps=periods(),today=localIso(new Date());
   if(!ps.length) return emptyCard("Ingen sæsoner","Administratoren opretter sæsoner under Runde → Sæsonplan.","")+cfgCard();
   const withRounds=ps.filter(p=>Object.values(D().rounds).some(r=>r.status==="done"&&r.id>=p.start&&r.id.slice(0,10)<=p.end));
-  const per=ps.find(p=>p.id===S.period)||ps.find(p=>p.start>=APP_START&&today<=p.end)||withRounds[withRounds.length-1]||ps[ps.length-1];
+  const tr=trips().filter(t=>Object.values(D().rounds).some(r=>r.trip===t.id)||t.end>=today);
+  const st=(S.period||"").startsWith("t:")&&tripById(S.period.slice(2));
+  const per=st?{...st,trip:true}:ps.find(p=>p.id===S.period)||ps.find(p=>p.start>=APP_START&&today<=p.end)||withRounds[withRounds.length-1]||ps[ps.length-1];
   const {rows,rounds,cfg}=seasonTable(per);
   const short=iso=>{const d=new Date(iso.slice(0,10)+"T12:00:00");return d.getDate()+"/"+(d.getMonth()+1)};
   const nf=n=>String(n).replace(".",",");
@@ -827,13 +843,13 @@ function vSeason(){
   const body=rows.map(r=>`<tr><td class="pos">${r.pos}</td><td class="nm"><strong>${esc(pname(r.pid))}</strong></td>
     <td class="r big">${nf(r.total)}</td><td class="r">${r.n}</td><td class="r">${r.wins||""}</td>
     ${rounds.map(x=>{const v=r.cells[x.id];return v==null?'<td class="d"></td>':`<td class="d ${r.counting.has(x.id)?"cnt":""}" title="${v.tie?"T":""}${v.pos}. plads, ${v.stb} stableford-point">${nf(v.pts)}${cfg.mode==="stb"?"":`<small>${v.stb}</small>`}</td>`}).join("")}</tr>`).join("");
-  const fin=tuesdaysIn(per).slice(-(Number(per.finales??2))).filter(()=>Number(per.finales??2)>0);
+  const fin=per.trip?[]:tuesdaysIn(per).slice(-(Number(per.finales??2))).filter(()=>Number(per.finales??2)>0);
   return `<div class="card">
-    <div class="row" style="margin-bottom:10px"><h2>${esc(per.name)}</h2><span class="spacer"></span><select id="per-sel" aria-label="Vælg sæson">${ps.slice().reverse().map(p=>`<option value="${p.id}" ${p.id===per.id?"selected":""}>${esc(p.name)}</option>`).join("")}</select></div>
+    <div class="row" style="margin-bottom:10px"><h2>${esc(per.name)}</h2><span class="spacer"></span><select id="per-sel" aria-label="Vælg sæson">${ps.slice().reverse().map(p=>`<option value="${p.id}" ${!per.trip&&p.id===per.id?"selected":""}>${esc(p.name)}</option>`).join("")}${tr.length?`<optgroup label="Ture">${tr.slice().reverse().map(t=>`<option value="t:${t.id}" ${per.trip&&t.id===per.id?"selected":""}>${esc(t.name)}</option>`).join("")}</optgroup>`:""}</select></div>
     <p class="small muted" style="margin:-4px 0 10px">${per.closed?'<span class="chip">Afsluttet</span> ':""}${esc(fmtDate(per.start))} til ${esc(fmtDate(per.end))}${fin.length?` · finale ${fin.map(d=>esc(fmtDate(d))).join(" og ")}`:""}</p>
-    ${rows.length?`<div class="tbl-wrap"><table class="tbl season"><thead><tr><th>Nr.</th><th class="nm">Spiller</th><th class="r">Point</th><th class="r">Runder</th><th class="r">Sejre</th>${head}</tr></thead><tbody>${body}</tbody></table></div>`:`<p class="muted">Ingen afsluttede runder i denne sæson endnu.</p>`}
-    <p class="note">${cfg.mode==="stb"?`Tallene er dagens stableford-point. De ${cfg.bestOf} bedste runder (markeret) lægges sammen.`:"Stort tal er point, lille tal er dagens stableford. Markerede felter tæller. Se pointmodellen nedenfor."} ${rounds.length} ${rounds.length===1?"tirsdag":"tirsdage"} spillet.</p>
-  </div>`+(per.rules?"":cfgCard());
+    ${rows.length?`<div class="tbl-wrap"><table class="tbl season"><thead><tr><th>Nr.</th><th class="nm">Spiller</th><th class="r">Point</th><th class="r">Runder</th><th class="r">${per.trip?"Dagsejre":"Sejre"}</th>${head}</tr></thead><tbody>${body}</tbody></table></div>`:`<p class="muted">Ingen afsluttede runder i denne sæson endnu.</p>`}
+    <p class="note">${per.trip?`Turens stilling: alle runders stableford-point lægges sammen. Turen tæller ikke i sæsonstillingen.`:cfg.mode==="stb"?`Tallene er dagens stableford-point. De ${cfg.bestOf} bedste runder (markeret) lægges sammen.`:"Stort tal er point, lille tal er dagens stableford. Markerede felter tæller. Se pointmodellen nedenfor."} ${per.trip?`${rounds.length} ${rounds.length===1?"runde":"runder"} spillet.`:`${rounds.length} ${rounds.length===1?"tirsdag":"tirsdage"} spillet.`}</p>
+  </div>`+(per.rules||per.trip?"":cfgCard());
 }
 function guideCard(){
   const sec=(t,items)=>`<h3 style="margin:16px 0 6px">${t}</h3><ul class="small" style="margin:0;padding-left:20px;line-height:1.55">${items.map(i=>`<li>${i}</li>`).join("")}</ul>`;
@@ -871,11 +887,12 @@ function guideCard(){
     "Du kan selv rette dit navn og dit handicap. Et nyt handicap bruges fra næste runde.",
     "Du kan kun rette dine egne oplysninger og taste scorer for din egen bold. Alt andet klares af administratoren."])}
   ${sec("Administrator",[
-    "Under <strong>Runde</strong> laver administratoren sæsonplan og bane pr. tirsdag, trykker <strong>Lav bolde</strong> (appen blander så folk spiller med flest forskellige) og starter og afslutter runden."])}
+    "Under <strong>Runde</strong> laver administratoren sæsonplan og bane pr. tirsdag, trykker <strong>Lav bolde</strong> (appen blander så folk spiller med flest forskellige) og starter og afslutter runden.",
+    "Ture til andre baner: under <strong>Runde</strong> → <strong>Andre baner</strong> oprettes banen med par, index og tees fra scorekortet. Under <strong>Ture</strong> oprettes turen med bane pr. dag. Turens runder har deres egen stilling under Info og tæller ikke i sæsonen."])}
   </div>`;
 }
 function vPlan(){
-  const ps=periods(),opts=k=>Object.keys(COURSES_DEFAULT).map(c=>`<option value="${c}" ${c===k?"selected":""}>${esc(course(c).name)}</option>`).join("");
+  const ps=periods(),opts=k=>courseIds().filter(homeCourse).map(c=>`<option value="${c}" ${c===k?"selected":""}>${esc(course(c).name)}</option>`).join("");
   const items=ps.slice().reverse().map(p=>{
     const open=S.planOpen===p.id,ts=tuesdaysIn(p),n=Number(p.finales??2),fins=n>0?ts.slice(-n):[];
     return `<div class="flight">
@@ -890,6 +907,72 @@ function vPlan(){
   return `<div class="card"><h2>Sæsonplan</h2><p class="small muted">Sæsonernes start, slut og antal finaler, og hvilken bane der spilles hver tirsdag. De sidste tirsdage i sæsonen er finaler med ${seasonCfg().finaleMult} gange point. Antallet sættes pr. sæson.</p>
     <div style="display:grid;gap:10px">${items}</div>
     <div class="row" style="margin-top:12px"><button data-act="planadd">Ny sæson</button></div></div>`;
+}
+/* Ture og andre baner (kun administrator) */
+function myTeeCourses(){const today=localIso(new Date());const ids=new Set(Object.keys(COURSES_DEFAULT));trips().filter(t=>t.end>=today).forEach(t=>Object.values(t.days||{}).forEach(c=>c&&ids.add(c)));return [...ids].filter(id=>D().courses[id]||COURSES_DEFAULT[id])}
+function vTrips(){
+  const fmtS=day=>new Date(day+"T12:00:00").toLocaleDateString("da-DK",{weekday:"short",day:"numeric",month:"short"});
+  const opts=k=>courseIds().map(c=>`<option value="${c}" ${c===k?"selected":""}>${esc(course(c).name)}</option>`).join("");
+  const items=trips().slice().reverse().map(t=>{
+    const open=S.tripOpen===t.id,ds=daysIn(t),used=[...new Set(Object.values(t.days||{}).filter(Boolean))];
+    return `<div class="flight">
+      <div class="row"><strong>${esc(t.name)}</strong><span class="small muted">${esc(fmtS(t.start))}${t.end!==t.start?" til "+esc(fmtS(t.end)):""}${used.length?" · "+used.map(c=>esc(course(c).name)).join(", "):""}</span><span class="spacer"></span><button class="sm" data-act="tripopen" data-id="${t.id}">${open?"Luk":"Ret"}</button></div>
+      ${open?`<div class="row" style="margin-top:8px"><label class="f" style="flex:1 1 140px">Navn<input id="tn-${t.id}" value="${esc(t.name)}"></label>
+        <label class="f">Første dag<input type="date" id="ts-${t.id}" value="${t.start}"></label><label class="f">Sidste dag<input type="date" id="te-${t.id}" value="${t.end}"></label></div>
+        <h3 style="margin-top:12px">Bane pr. dag</h3>
+        <div class="chk">${ds.map(day=>`<label style="justify-content:space-between"><span>${esc(fmtS(day))}</span><select id="td-${day}" aria-label="Bane ${day}"><option value="">Ingen runde</option>${opts(t.days?.[day])}</select></label>`).join("")}</div>
+        <p class="note">Mangler banen? Opret den under "Andre baner" herunder først. Ret datoerne og tryk Gem, så kommer de nye dage med.</p>
+        <div class="row" style="margin-top:8px"><button class="primary sm" data-act="tripsave" data-id="${t.id}">Gem tur</button>${S.confirmTripDel===t.id?`<span class="small">Slet turen? Runder der er spillet, bliver liggende.</span><button class="sm" data-act="tripnodel">Fortryd</button><button class="sm danger" data-act="tripdel" data-id="${t.id}">Ja, slet</button>`:`<button class="sm ghost" data-act="tripaskdel" data-id="${t.id}">Slet tur</button>`}</div>`:""}
+    </div>`;}).join("");
+  return `<div class="card"><h2>Ture</h2><p class="small muted">En tur er fx et par dage på Fyn. Vælg banen for hver dag. Når du starter en runde på en af turens dage, vælges banen automatisk, og runden tæller i turens egen stilling (samlet stableford) under Info. Den tæller ikke i sæsonstillingen.</p>
+    ${items?`<div style="display:grid;gap:10px">${items}</div>`:""}
+    <div class="row" style="margin-top:12px"><button data-act="tripadd">Ny tur</button></div></div>`;
+}
+function saveTrips(list,msg){return safe(()=>put("config/trips",{list}),msg||"Turen er gemt")}
+function blankCourse(){return {id:null,name:"",par:Array(18).fill(""),si:Array(18).fill(""),tees:[{n:"",cr:"",slope:""},{n:"",cr:"",slope:""},{n:"",cr:"",slope:""}],def:"",note:""}}
+function courseToEdit(id){const c=course(id);return {id,name:c.name,par:c.par.slice(),si:c.si.slice(),tees:Object.entries(c.tees||{}).map(([n,v])=>({n,cr:String(v.cr).replace(".",","),slope:String(v.slope)})).concat([{n:"",cr:"",slope:""}]),def:c.defaultTee||"",note:c.note||""}}
+function vCourses(){
+  const own=Object.keys(D().courses||{}).filter(id=>!COURSES_DEFAULT[id]&&!course(id).hidden);
+  const e=S.ce;
+  const list=own.map(id=>{const c=course(id);return `<div class="row" style="justify-content:space-between;margin:4px 0"><span><strong>${esc(c.name)}</strong> <span class="small muted">par ${sum(c.par||[])} · ${Object.keys(c.tees||{}).length} tees${c.provisional?" · foreløbig":""}</span></span><button class="sm" data-act="ceopen" data-id="${id}">Ret</button></div>`}).join("");
+  const grid=(k,lab)=>[0,9].map(o=>`<div style="display:grid;grid-template-columns:52px repeat(9,1fr);gap:3px;margin-bottom:4px;align-items:center"><span class="small muted">${o?"Hul 10-18":"Hul 1-9"}</span>${Array.from({length:9},(_,i)=>`<input id="ce-${k}-${o+i}" inputmode="numeric" aria-label="${lab} hul ${o+i+1}" placeholder="${o+i+1}" value="${esc(e[k][o+i])}" style="width:100%;min-width:0;padding:6px 2px;text-align:center">`).join("")}</div>`).join("");
+  const form=e?`<div class="flight" style="margin-top:10px">
+    <label class="f">Banens navn<input id="ce-name" value="${esc(e.name)}" placeholder="fx Great Northern"></label>
+    <h3 style="margin-top:12px">Par pr. hul</h3>${grid("par","Par")}
+    <h3 style="margin-top:12px">Index pr. hul (1 er sværest)</h3>${grid("si","Index")}
+    <h3 style="margin-top:12px">Tees (herrer)</h3>
+    <p class="small muted" style="margin:0 0 6px">Står på scorekortet eller på DGU's sloperegistrering.</p><div style="display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:6px" class="small muted"><span>Tee</span><span>Course rating</span><span>Slope</span></div>
+    ${e.tees.map((t,i)=>`<div style="display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:6px;margin-bottom:4px"><input id="ce-tn-${i}" value="${esc(t.n)}" placeholder="Tee, fx Gul" style="width:100%;min-width:0" aria-label="Tee navn"><input id="ce-tc-${i}" inputmode="decimal" value="${esc(t.cr)}" placeholder="CR, fx 70,5" style="width:100%;min-width:0" aria-label="Course rating"><input id="ce-ts-${i}" inputmode="numeric" value="${esc(t.slope)}" placeholder="Slope" style="width:100%;min-width:0" aria-label="Slope"></div>`).join("")}
+    <button class="sm ghost" data-act="ceaddtee">Flere tees</button>
+    <label class="f" style="margin-top:10px">Standard-tee (navnet på den tee de fleste spiller)<input id="ce-def" value="${esc(e.def)}" style="width:140px"></label>
+    <div class="row" style="margin-top:12px"><button class="primary" data-act="cesave">Gem bane</button><button class="ghost" data-act="ceclose">Fortryd</button>${e.id?`<span class="spacer"></span><button class="ghost sm" data-act="cehide">Fjern bane</button>`:""}</div>
+    ${e.note?`<p class="note">${esc(e.note)}</p>`:""}
+  </div>`:"";
+  return `<div class="card"><h2>Andre baner</h2><p class="small muted">Old og New Course ligger fast i appen. Her opretter du andre baner til ture. Appen bruger par, index, course rating og slope til at regne spillehandicap og stableford præcis som hjemme.</p>
+    ${list||`<p class="muted small">Ingen andre baner endnu.</p>`}
+    ${e?form:`<div class="row" style="margin-top:12px"><button data-act="ceopen">Opret bane</button></div>`}</div>`;
+}
+function readCourseForm(){
+  const e=S.ce;if(!e)return;
+  const v=id=>($("#"+id)?.value??"").trim();
+  e.name=v("ce-name");e.def=v("ce-def");
+  for(let i=0;i<18;i++){e.par[i]=v("ce-par-"+i);e.si[i]=v("ce-si-"+i)}
+  e.tees=e.tees.map((t,i)=>({n:v("ce-tn-"+i),cr:v("ce-tc-"+i),slope:v("ce-ts-"+i)}));
+}
+function courseFromForm(){
+  readCourseForm();const e=S.ce;
+  if(!e.name)return "Skriv banens navn";
+  const par=e.par.map(x=>parseInt(x)),si=e.si.map(x=>parseInt(x));
+  const badPar=par.findIndex(x=>!(x>=3&&x<=6));if(badPar>=0)return `Par på hul ${badPar+1} mangler eller er forkert (skal være 3, 4, 5 eller 6)`;
+  const badSi=si.findIndex(x=>!(x>=1&&x<=18));if(badSi>=0)return `Index på hul ${badSi+1} mangler (skal være et tal fra 1 til 18)`;
+  const dup=si.findIndex((x,i)=>si.indexOf(x)!==i);if(dup>=0)return `Index ${si[dup]} står to gange (hul ${si.indexOf(si[dup])+1} og hul ${dup+1}). Hvert tal fra 1 til 18 skal bruges én gang`;
+  const tees={};
+  for(const t of e.tees){if(!t.n&&!t.cr&&!t.slope)continue;const cr=parseFloat(t.cr.replace(",",".")),slope=parseInt(t.slope);
+    if(!t.n)return "En tee mangler navn";if(!(cr>=50&&cr<=85))return `Course rating for tee ${t.n} ser forkert ud (fx 70,5)`;if(!(slope>=55&&slope<=155))return `Slope for tee ${t.n} skal være mellem 55 og 155`;
+    tees[t.n.replace(/[^A-Za-z0-9ÆØÅæøå .-]/g,"")]={cr,slope}}
+  if(!Object.keys(tees).length)return "Skriv mindst én tee med course rating og slope";
+  const def=tees[e.def]?e.def:Object.keys(tees)[0];
+  return {name:e.name,par,si,tees,defaultTee:def,provisional:false,hidden:false};
 }
 function savePeriods(list){return safe(()=>put("config/periods",{list}),"Sæsonplanen er gemt")}
 function cfgText(c){
@@ -931,7 +1014,7 @@ function vPlayers(){
     <p class="muted small">${adm?"Som administrator kan du rette alle spillere.":"Du kan kun rette dit eget navn og handicap."} Et nyt handicap bruges fra næste runde.</p>${missing?`<p class="chip warn">${missing} spillere mangler handicap</p>`:""}
     ${ps.length?`<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Navn</th><th>Handicap</th><th class="r">Runder spillet</th>${adm?"<th>Login</th>":""}</tr></thead><tbody>${rows}</tbody></table></div>`:`<p class="muted">Ingen spillere endnu. Tilføj gruppen herunder.</p>`}
   </div>
-  ${me&&D().players[me]?`<div class="card"><h3>Mit teested</h3><p class="small muted" style="margin:0 0 8px">Bruges automatisk, når en runde startes. Du kan også skifte tee på selve dagen under Indtast.</p><div class="row">${Object.keys(COURSES_DEFAULT).map(cid=>{const c=course(cid),cur=D().players[me]?.tee?.[cid]||c.defaultTee;return `<label class="f">${esc(c.name)}<select id="pt-${cid}" data-c="${cid}">${Object.entries(c.tees||{}).map(([t,v])=>`<option value="${t}" ${t===cur?"selected":""}>${t} (CR ${String(v.cr).replace(".",",")} / slope ${v.slope})</option>`).join("")}</select></label>`}).join("")}</div></div>`:""}
+  ${me&&D().players[me]?`<div class="card"><h3>Mit teested</h3><p class="small muted" style="margin:0 0 8px">Bruges automatisk, når en runde startes. Du kan også skifte tee på selve dagen under Indtast.</p><div class="row">${myTeeCourses().map(cid=>{const c=course(cid),cur=D().players[me]?.tee?.[cid]||c.defaultTee;return `<label class="f">${esc(c.name)}<select id="pt-${cid}" data-c="${cid}">${Object.entries(c.tees||{}).map(([t,v])=>`<option value="${t}" ${t===cur?"selected":""}>${t} (CR ${String(v.cr).replace(".",",")} / slope ${v.slope})</option>`).join("")}</select></label>`}).join("")}</div></div>`:""}
   ${me&&logins()[me]?`<div class="card"><h3>Skift adgangskode</h3>${logins()[me].changed?"":`<p class="small muted" style="margin:0 0 8px">Din adgangskode er stadig din fødselsdato. Den er let at gætte, så skift den gerne.</p>`}
     <div class="row"><label class="f">Nuværende<input id="cp-old" type="password" autocomplete="current-password" style="width:130px"></label><label class="f">Ny<input id="cp-new" type="password" autocomplete="new-password" style="width:130px"></label><label class="f">Gentag ny<input id="cp-new2" type="password" autocomplete="new-password" style="width:130px"></label><button data-act="changepw" style="align-self:end">Skift</button></div></div>`:""}
   ${adm?`<div class="card"><h3>Tilføj spiller</h3>
@@ -970,7 +1053,7 @@ function vRound(){
   if(!adm) return html+`<div class="card"><p class="muted" style="margin:0">Kun administratoren kan oprette runder, fordele bolde og afslutte runder.</p></div>`;
   const ps0=Object.values(D().players).filter(p=>!p.guest).sort((a,b)=>a.name.localeCompare(b.name,"da"));
   if(!ps0.length) return html+emptyCard("Tilføj spillere først","Før I kan starte en runde, skal gruppen være oprettet med navn og handicap.",`<a class="btn" href="#spillere">Gå til Spillere</a>${demoBtn()}`);
-  const d=S.draft||(S.draft={date:openTuesdays()[0]||nextTuesday(),course:courseFor(openTuesdays()[0]||nextTuesday())||"old",match:"stb",counts:true,sel:draftSel(openTuesdays()[0]||nextTuesday()),flights:null});
+  const d=S.draft||(S.draft=newDraft(openTuesdays()[0]||nextTuesday()));
   const ps=ps0.concat(signupInfo(d.date).guests.map(g=>({id:g.id,name:g.name+" (gæst)",hi:g.hi,guest:true})));
   const hasSign=signupInfo(d.date).members.length>0;
   const sel=ps.filter(p=>d.sel[p.id]);
@@ -979,7 +1062,7 @@ function vRound(){
     +`<p class="note" style="grid-column:1/-1">${repeatPairs(d.flights,hist)?`${repeatPairs(d.flights,hist)} makkerpar har spillet sammen før i sæsonen (↺).`:"Ingen har spillet sammen før i sæsonen."} Du kan flytte spillere mellem boldene eller trykke "Lav bolde" igen.</p>`:"";
   html+=`<div class="card"><h2>Ny runde</h2>
     <div class="row" style="margin:10px 0"><label class="f">Dato<input type="date" id="nr-date" value="${d.date}"></label>
-    <label class="f">Bane<select id="nr-course">${Object.keys(COURSES_DEFAULT).map(k=>`<option value="${k}" ${k===d.course?"selected":""}>${esc(course(k).name)}</option>`).join("")}</select></label>
+    <label class="f">Bane<select id="nr-course">${courseIds().map(k=>`<option value="${k}" ${k===d.course?"selected":""}>${esc(course(k).name)}</option>`).join("")}</select></label>
     <label class="f">Tee for gæster og spillere uden valg<select id="nr-tee">${Object.entries(course(d.course).tees||{}).map(([t,v])=>`<option value="${t}" ${t===(d.tee||course(d.course).defaultTee)?"selected":""}>${t} (CR ${String(v.cr).replace(".",",")} / slope ${v.slope})</option>`).join("")}</select></label>
     <label class="f">Dagens match<select id="nr-match">${Object.entries(MATCH).map(([k,l])=>`<option value="${k}" ${k===d.match?"selected":""}>${l}</option>`).join("")}</select></label></div>
     <label class="row small" style="margin-bottom:10px"><input type="checkbox" id="nr-counts" ${d.counts?"checked":""}> Tæller i sæsonstillingen (altid som stableford)</label>
@@ -989,9 +1072,10 @@ function vRound(){
     <div class="chk">${ps.map(p=>`<label><input type="checkbox" id="sel-${p.id}" data-pid="${p.id}" ${d.sel[p.id]?"checked":""}> ${esc(p.name)}</label>`).join("")}</div></details>
     <div class="row" style="margin-top:14px"><span class="spacer"></span>${live?`<span class="small muted">Afslut den aktive runde ovenfor, før du starter en ny.</span>`:""}<button class="primary" data-act="start" ${live||!d.flights||sel.length<2?"disabled":""}>Start runde</button></div>
     ${fls?`<div class="flights" style="margin-top:12px">${fls}</div>`:`<p class="note">Tryk "Lav bolde", så fordeler appen spillerne i 4- og 3-bolde, så folk spiller med så mange forskellige som muligt i løbet af sæsonen.</p>`}
-    ${course(d.course).provisional?`<p class="note">Par og index pr. hul for ${esc(course(d.course).name)} er foreløbige, indtil vi har scorekortet. CR og slope er de rigtige.</p>`:""}
+    ${tripOf(d.date)?`<p class="chip" style="margin:0 0 10px">${esc(tripOf(d.date).name)}: runden tæller i turens stilling</p>`:""}
+    ${course(d.course).provisional?`<p class="note">${course(d.course).note?esc(course(d.course).note):`Par og index pr. hul for ${esc(course(d.course).name)} er foreløbige, indtil vi har scorekortet. CR og slope er de rigtige.`}</p>`:""}
   </div>`;
-  return html+vPlan();
+  return html+vPlan()+vTrips()+vCourses();
 }
 
 /* ---------- Handlinger ---------- */
@@ -1021,6 +1105,29 @@ document.addEventListener("click",ev=>{
     const v=a==="par"||!cur?par:Math.max(1,Math.min(15,cur+(a==="inc"?1:-1)));
     setScore(el.dataset.pid,v);
   }
+  else if(["tripadd","tripsave","tripdel","ceopen","cesave","cehide"].includes(a)&&!isAdmin()){toast(ADMIN_ONLY)}
+  else if(a==="tripopen"){S.tripOpen=S.tripOpen===el.dataset.id?null:el.dataset.id;S.confirmTripDel=null;render()}
+  else if(a==="tripadd"){const id="t"+newId(),day=localIso(new Date());S.tripOpen=id;saveTrips(trips().concat([{id,name:"Ny tur",start:day,end:day,days:{}}]),"Turen er oprettet. Ret navn, datoer og baner")}
+  else if(a==="tripsave"){
+    const id=el.dataset.id,t=tripById(id),name=$("#tn-"+id).value.trim(),start=$("#ts-"+id).value,end=$("#te-"+id).value;
+    if(!name||!start||!end||end<start){toast("Udfyld navn, og sæt sidste dag efter første dag");return}
+    if((new Date(end)-new Date(start))/864e5>30){toast("En tur kan højst vare 31 dage");return}
+    const other=trips().find(o=>o.id!==id&&o.start<=end&&o.end>=start);if(other){toast(`Datoerne overlapper med turen ${other.name}`);return}
+    const days={};daysIn({start,end}).forEach(d=>{const sel=$("#td-"+d);const v=sel?sel.value:t.days?.[d];if(v)days[d]=v});
+    saveTrips(trips().map(o=>o.id===id?{...o,name,start,end,days}:o));
+  }
+  else if(a==="tripaskdel"){S.confirmTripDel=el.dataset.id;render()}
+  else if(a==="tripnodel"){S.confirmTripDel=null;render()}
+  else if(a==="tripdel"){const id=el.dataset.id;S.tripOpen=null;S.confirmTripDel=null;saveTrips(trips().filter(t=>t.id!==id),"Turen er slettet")}
+  else if(a==="ceopen"){S.ce=el.dataset.id?courseToEdit(el.dataset.id):blankCourse();render()}
+  else if(a==="ceclose"){S.ce=null;render()}
+  else if(a==="ceaddtee"){readCourseForm();S.ce.tees.push({n:"",cr:"",slope:""},{n:"",cr:"",slope:""});render()}
+  else if(a==="cesave"){
+    const c=courseFromForm();if(typeof c==="string"){toast(c,"err");return}
+    let id=S.ce.id;if(!id){id=c.name.toLowerCase().replace(/æ/g,"ae").replace(/ø/g,"oe").replace(/å/g,"aa").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")||"bane";if(COURSES_DEFAULT[id]||D().courses[id])id+="-"+newId().slice(0,4)}
+    S.ce=null;safe(()=>put("courses/"+id,c),c.name+" er gemt");
+  }
+  else if(a==="cehide"){const id=S.ce?.id;if(!id)return;S.ce=null;safe(()=>put("courses/"+id,{hidden:true},true),"Banen er fjernet fra menuerne. Gamle runder på banen er uændrede")}
   else if(a==="planopen"){S.planOpen=S.planOpen===el.dataset.id?null:el.dataset.id;render()}
   else if(["plansave","plandel","planadd"].includes(a)&&!isAdmin()){toast(ADMIN_ONLY)}
   else if(a==="plansave"){
@@ -1071,13 +1178,13 @@ document.addEventListener("click",ev=>{
   }
   else if(a==="quickshuffle"){
     if(!isAdmin()){toast(ADMIN_ONLY,"err");return}
-    if(!S.draft){const day=openTuesdays()[0]||nextTuesday();S.draft={date:day,course:courseFor(day)||"old",match:"stb",counts:true,sel:draftSel(day),flights:null}}
+    if(!S.draft)S.draft=newDraft(openTuesdays()[0]||nextTuesday());
     const d=S.draft,ids=Object.keys(d.sel).filter(k=>d.sel[k]);
     d.flights=makeFlights(ids,pairHistory(d.date));render();
     toast(`${ids.length} spillere er fordelt i ${Math.max(...Object.values(d.flights))} bolde`,"ok");
     setTimeout(()=>document.querySelector(".flights .flight")?.scrollIntoView({behavior:"smooth",block:"start"}),50);
   }
-  else if(a==="gobolde"){S.draft=null;const day=el.dataset.day;S.draft={date:day,course:courseFor(day)||"old",match:"stb",counts:true,sel:draftSel(day),flights:null};S.forceView="runde";try{history.replaceState(null,"","#runde")}catch(e){}render();window.scrollTo(0,0)}
+  else if(a==="gobolde"){S.draft=newDraft(el.dataset.day);S.forceView="runde";try{history.replaceState(null,"","#runde")}catch(e){}render();window.scrollTo(0,0)}
   else if(a==="shuffle"){
     const d=S.draft,ids=Object.keys(d.sel).filter(k=>d.sel[k]);
     d.flights=makeFlights(ids,pairHistory(d.date));render();
@@ -1091,7 +1198,7 @@ document.addEventListener("click",ev=>{
     const flights={};ids.forEach(p=>flights[p]=d.flights[p]);
     S.draft=null;
     safe(async()=>{for(const g of gs) await put("players/"+g.id,{name:g.name,hi:g.hi,guest:true,active:false});
-      await put("rounds/"+rid,{date:d.date,course:d.course,status:"live",tee:d.tee||course(d.course).defaultTee,tees,match:d.match,counts:d.counts,players:ids,flights,hcp,created:Date.now()})},"Runden er startet").then(()=>{location.hash="#live"});
+      await put("rounds/"+rid,{date:d.date,course:d.course,trip:tripOf(d.date)?.id||null,status:"live",tee:d.tee||course(d.course).defaultTee,tees,match:d.match,counts:d.counts,players:ids,flights,hcp,created:Date.now()})},"Runden er startet").then(()=>{location.hash="#live"});
   }
   else if(a==="askend"){S.confirmEnd=true;render()}
   else if(a==="noend"){S.confirmEnd=false;render()}
@@ -1147,6 +1254,7 @@ document.addEventListener("click",ev=>{
   else if(a==="reopen"){safe(()=>put("rounds/"+r.id,{status:"live"},true),"Runden er genåbnet")}
 });
 document.addEventListener("change",ev=>{
+  if((ev.target.id||"").startsWith("ce-")){readCourseForm();return}
   if(ev.target.id==="cfg-mode"){const l=$("#cfg-scale")?.closest("label");if(l)l.style.display=ev.target.value==="scale"?"":"none"}
   const el=ev.target;
   if(el.id==="me-sel"){if(!el.value)return;if(S.demo)S.meDemo=el.value;else{S.me=el.value;lsSet("tg-me",el.value)}S.hole=1;render()}
@@ -1162,7 +1270,7 @@ document.addEventListener("change",ev=>{
     const hi=parseFloat(el.value.replace(",","."));if(isNaN(hi)){toast("Handicap skal være et tal");return}
     safe(()=>put("players/"+el.dataset.pid,{hi},true),"Handicap opdateret");
   }
-  else if(el.id==="nr-date"){S.draft.date=el.value;S.draft.course=courseFor(el.value)||S.draft.course;S.draft.sel=draftSel(el.value);S.draft.flights=null;render()}
+  else if(el.id==="nr-date"){const t0=S.draft.tee,c0=S.draft.course;S.draft={...newDraft(el.value),course:dayCourse(el.value)||c0,match:S.draft.match};S.draft.tee=S.draft.course===c0?t0:null;render()}
   else if((el.id||"").startsWith("as-")){if(!isAdmin()||!el.value)return;const day=el.id.slice(3);safe(()=>put(`signups/${day}/entries/${el.value}`,{guest:false,at:Date.now()}),pname(el.value)+" er tilmeldt")}
   else if(el.id==="nr-course"){S.draft.course=el.value;S.draft.tee=null;render()}
   else if(el.id==="nr-match"){S.draft.match=el.value}
