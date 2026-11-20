@@ -172,7 +172,7 @@ button.sm{min-height:32px;padding:4px 10px;font-size:13px}
 <div id="banner"></div>
 <main class="wrap" id="view"><div class="card empty"><p class="muted">Henter runder…</p></div></main>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 39</p>
+<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 40</p>
 
 <script>
 /* ---------- Konfiguration (let at justere) ---------- */
@@ -656,10 +656,15 @@ function icsFor(key){
   const loc=t?cs:"The Scandinavian"+(cs?", "+cs:"");
   const d=x=>x.replace(/-/g,""),next=x=>{const z=new Date(x+"T12:00:00");z.setDate(z.getDate()+1);return localIso(z)};
   const e=x=>String(x).replace(/[\\,;]/g,m=>"\\"+m);
-  return ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Tirsdagsklubben//DA","CALSCALE:GREGORIAN","BEGIN:VEVENT",
-    "UID:tk-"+key+"-"+(myId()||"x")+"@tirsdagsklubben","DTSTAMP:"+new Date().toISOString().replace(/[-:]/g,"").slice(0,15)+"Z",
-    "DTSTART;VALUE=DATE:"+d(start),"DTEND;VALUE=DATE:"+d(next(end)),"SUMMARY:"+e(title),loc?"LOCATION:"+e(loc):"",
-    "DESCRIPTION:"+e("Du er tilmeldt i Tirsdagsklubben-appen."),"END:VEVENT","END:VCALENDAR"].filter(Boolean).join("\r\n");
+  const stamp="DTSTAMP:"+new Date().toISOString().replace(/[-:]/g,"").slice(0,15)+"Z",uid=k=>"UID:tk-"+k+"-"+(myId()||"x")+"@tirsdagsklubben";
+  const desc="DESCRIPTION:"+e("Du er tilmeldt i Tirsdagsklubben-appen.");
+  const times=t?.times||{},timed=Object.keys(times).filter(x=>x>=start&&x<=end).sort();
+  // Med starttid: én aftale pr. dag med tid (5 timer, lokal tid). Uden: en heldagsbegivenhed for hele turen.
+  const ev=timed.length?timed.map(x=>{const [h,m]=times[x].split(":").map(Number),eh=Math.min(23,h+5),c=t.days?.[x]?course(t.days[x]).name:cs;
+      return ["BEGIN:VEVENT",uid(key+"-"+x),stamp,"DTSTART:"+d(x)+"T"+String(h).padStart(2,"0")+String(m).padStart(2,"0")+"00","DTEND:"+d(x)+"T"+String(eh).padStart(2,"0")+String(m).padStart(2,"0")+"00",
+        "SUMMARY:"+e(title+(timed.length>1?" ("+new Date(x+"T12:00:00").toLocaleDateString("da-DK",{weekday:"long"})+")":"")),c?"LOCATION:"+e(c):"",desc,"BEGIN:VALARM","TRIGGER:-PT2H","ACTION:DISPLAY","DESCRIPTION:"+e(title),"END:VALARM","END:VEVENT"]}).flat()
+    :["BEGIN:VEVENT",uid(key),stamp,"DTSTART;VALUE=DATE:"+d(start),"DTEND;VALUE=DATE:"+d(next(end)),"SUMMARY:"+e(title),loc?"LOCATION:"+e(loc):"",desc,"END:VEVENT"];
+  return ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Tirsdagsklubben//DA","CALSCALE:GREGORIAN",...ev,"END:VCALENDAR"].filter(Boolean).join("\r\n");
 }
 function downloadIcs(key){
   const txt=icsFor(key),name="tirsdagsklubben-"+key+".ics";
@@ -679,7 +684,7 @@ function vEvents(){
     const rm=e=>(adm||(!e.guest&&e.id===me)||(e.guest&&e.by===me))?` <button class="ghost sm" data-act="unsign" data-day="${id}" data-id="${e.id}" aria-label="Fjern">Fjern</button>`:"";
     const list=ms.map(e=>`<li><span>${esc(pname(e.id))}${e.id===me?" (dig)":""}</span>${rm(e)}</li>`).join("")+gs.map(e=>`<li><span>${esc(e.name)} <span class="muted small">gæst af ${esc(pname(e.by))}${e.hi!=null?", hcp "+String(e.hi).replace(".",","):""}</span></span>${rm(e)}</li>`).join("");
     return `<div class="card">
-      <div class="row"><div><h2>${esc(t.name)}</h2><div class="small muted">${esc(fmtS(t.start))}${t.end!==t.start?" til "+esc(fmtS(t.end)):""}${cs?" · "+cs:""} · ${ms.length} tilmeldt${gs.length?` · ${gs.length} ${gs.length===1?"gæst":"gæster"}`:""}</div></div><span class="spacer"></span>
+      <div class="row"><div><h2>${esc(t.name)}</h2><div class="small muted">${esc(fmtS(t.start))}${t.end!==t.start?" til "+esc(fmtS(t.end)):""}${t.times?.[t.start]?" · første start kl. "+esc(t.times[t.start]):""}${cs?" · "+cs:""} · ${ms.length} tilmeldt${gs.length?` · ${gs.length} ${gs.length===1?"gæst":"gæster"}`:""}</div></div><span class="spacer"></span>
       ${me&&!D().players[me]?.guest?(isIn?`<button class="sm" data-act="ics" data-day="${id}">📅 Læg i kalender</button><button data-act="unsign" data-day="${id}" data-id="${me}">Afmeld mig</button>`:`<button class="primary" data-act="sign" data-day="${id}">Tilmeld mig</button>`):""}</div>
       ${all.length?`<ol class="signlist">${list}</ol>`:`<p class="muted">Ingen tilmeldte endnu.</p>`}
       ${adm?`<div class="row"><select id="as-${id}" aria-label="Tilmeld medlem"><option value="">Tilmeld et medlem…</option>${members.filter(p=>!ms.some(e=>e.id===p.id)).map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join("")}</select></div>`:""}
@@ -966,7 +971,8 @@ function vTrips(){
       ${open?`<div class="row" style="margin-top:8px"><label class="f" style="flex:1 1 140px">Navn<input id="tn-${t.id}" value="${esc(t.name)}"></label>
         <label class="f">Første dag<input type="date" id="ts-${t.id}" value="${t.start}"></label><label class="f">Sidste dag<input type="date" id="te-${t.id}" value="${t.end}"></label></div>
         <h3 style="margin-top:12px">Bane pr. dag</h3>
-        <div class="chk">${ds.map(day=>`<label style="justify-content:space-between"><span>${esc(fmtS(day))}</span><select id="td-${day}" aria-label="Bane ${day}"><option value="">Ingen runde</option>${opts(t.days?.[day])}</select></label>`).join("")}</div>
+        <div style="display:grid;gap:6px">${ds.map(day=>`<div style="display:grid;grid-template-columns:1fr 1.4fr 92px;gap:6px;align-items:center"><span class="small">${esc(fmtS(day))}</span><select id="td-${day}" aria-label="Bane ${day}" style="min-width:0"><option value="">Ingen runde</option>${opts(t.days?.[day])}</select><input type="time" id="tt-${day}" value="${esc(t.times?.[day]||"")}" aria-label="Første start ${day}" style="min-width:0"></div>`).join("")}</div>
+        <p class="small muted" style="margin:4px 0 0">Bane og første starttid pr. dag.</p>
         <p class="note">Mangler banen? Opret den under "Andre baner" herunder først. Ret datoerne og tryk Gem, så kommer de nye dage med.</p>
         <div class="row" style="margin-top:8px"><button class="primary sm" data-act="tripsave" data-id="${t.id}">Gem tur</button>${S.confirmTripDel===t.id?`<span class="small">Slet turen? Runder der er spillet, bliver liggende.</span><button class="sm" data-act="tripnodel">Fortryd</button><button class="sm danger" data-act="tripdel" data-id="${t.id}">Ja, slet</button>`:`<button class="sm ghost" data-act="tripaskdel" data-id="${t.id}">Slet tur</button>`}</div>`:""}
     </div>`;}).join("");
@@ -1176,8 +1182,9 @@ document.addEventListener("click",ev=>{
     if(!name||!start||!end||end<start){toast("Udfyld navn, og sæt sidste dag efter første dag");return}
     if((new Date(end)-new Date(start))/864e5>30){toast("En tur kan højst vare 31 dage");return}
     const other=trips().find(o=>o.id!==id&&o.start<=end&&o.end>=start);if(other){toast(`Datoerne overlapper med turen ${other.name}`);return}
-    const days={};daysIn({start,end}).forEach(d=>{const sel=$("#td-"+d);const v=sel?sel.value:t.days?.[d];if(v)days[d]=v});
-    saveTrips(trips().map(o=>o.id===id?{...o,name,start,end,days}:o));
+    const days={},times={};daysIn({start,end}).forEach(d=>{const sel=$("#td-"+d);const v=sel?sel.value:t.days?.[d];if(v)days[d]=v;
+      const ti=$("#tt-"+d);const tv=ti?ti.value:t.times?.[d];if(tv)times[d]=tv});
+    saveTrips(trips().map(o=>o.id===id?{...o,name,start,end,days,times}:o));
   }
   else if(a==="tripaskdel"){S.confirmTripDel=el.dataset.id;render()}
   else if(a==="tripnodel"){S.confirmTripDel=null;render()}
