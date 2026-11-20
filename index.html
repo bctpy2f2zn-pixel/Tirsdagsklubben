@@ -172,7 +172,7 @@ button.sm{min-height:32px;padding:4px 10px;font-size:13px}
 <div id="banner"></div>
 <main class="wrap" id="view"><div class="card empty"><p class="muted">Henter runder…</p></div></main>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 28</p>
+<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 29</p>
 
 <script>
 /* ---------- Konfiguration (let at justere) ---------- */
@@ -300,7 +300,7 @@ function checkBirdies(rid){
   const fresh=birdieList(r).filter(b=>{const k=b.pid+"/"+b.h;if(birdieSeen.has(k))return false;birdieSeen.add(k);return !first});
   // Man får ikke besked om sin egen birdie
   const show=fresh.filter(b=>b.pid!==myId());
-  if(show.length)birdieToast(show.map(b=>`${b.v===1?"🎯":b.d<=-2?"🦅":"🐦"} ${pname(b.pid)} har lavet ${birdieWord(b.v,b.d)} på hul ${b.h+1}`));
+  if(show.length&&S.push!=="on")birdieToast(show.map(b=>`${b.v===1?"🎯":b.d<=-2?"🦅":"🐦"} ${pname(b.pid)} har lavet ${birdieWord(b.v,b.d)} på hul ${b.h+1}`));
 }
 function conflictList(r){
   const out=[];
@@ -658,7 +658,7 @@ function scorecard(r,t){
 
 function vLive(){
   const r=currentRound();
-  if(!r) return emptyCard("Ingen runder endnu","Når en runde er startet under Runde, vises stillingen her og opdaterer sig selv, mens der tastes ude på banen.",`<a class="btn" href="#runde">Start en runde</a>${demoBtn()}`);
+  if(!r) return emptyCard("Ingen runder endnu","Når en runde er startet under Runde, vises stillingen her og opdaterer sig selv, mens der tastes ude på banen.",`<a class="btn" href="#runde">Start en runde</a>${demoBtn()}`)+pushCard();
   if(S.boardRid!==r.id){S.boardRid=r.id;S.board=r.match||"stb"}
   const key={stb:["stb",-1],gross:["toPar",1],net:["netToPar",1]}[S.board];
   const list=ranked((r.players||[]).map(p=>playerTotals(r,p)),key[0],key[1]);
@@ -681,9 +681,56 @@ function vLive(){
     <div class="row" style="margin-bottom:10px"><div><h2>${r.status==="live"?"Leaderboard":"Resultat"}</h2><div class="small muted">Dagens match: ${MATCH[r.match||"stb"]}${isFinale(r)?" · finale":""}${r.counts===false?" · tæller ikke i sæsonen":""}</div></div><span class="spacer"></span><div class="seg" role="group" aria-label="Spilleform">${seg}</div></div>
     <div class="tbl-wrap"><table class="lb"><colgroup><col style="width:44px"><col><col style="width:48px"><col style="width:64px"></colgroup><thead><tr><th>Pos</th><th>Spiller</th><th class="num">Hul</th><th class="num">${S.board==="stb"?"Point":"Score"}</th></tr></thead><tbody>${rows}</tbody></table></div>
     <p class="note">Tryk på en spiller for at se scorekortet. Huller med afvigelse tæller ikke med, før de er rettet. Lysere tal er kun tastet af én markør.</p>
-  </div>${birdieCard(r)}`;
+  </div>${birdieCard(r)}${pushCard()}`;
 }
 
+/* ---------- Push (birdie-beskeder når appen er lukket) ---------- */
+const isIOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+const standalone=()=>navigator.standalone===true||matchMedia("(display-mode: standalone)").matches;
+function pushSupported(){return "serviceWorker" in navigator&&"PushManager" in window&&"Notification" in window}
+async function pushInit(){
+  if(S.demo||!SB)return;
+  if(!pushSupported()){S.push=isIOS&&!standalone()?"ios":"unsupported";render();return}
+  if(Notification.permission==="denied"){S.push="denied";render();return}
+  try{
+    const reg=await navigator.serviceWorker.ready;const sub=await reg.pushManager.getSubscription();
+    S.push=sub&&Notification.permission==="granted"?"on":"off";
+    // Gem igen ved hver start, så telefonen altid hører til den der er logget ind
+    if(S.push==="on")await SB.rpc("save_push",{p_sub:sub.toJSON()});
+  }catch(e){S.push=S.push||"off"}
+  render();
+}
+function b64u(s){const p="=".repeat((4-s.length%4)%4),b=atob((s+p).replace(/-/g,"+").replace(/_/g,"/"));return Uint8Array.from(b,c=>c.charCodeAt(0))}
+async function pushOn(){
+  let perm;
+  try{perm=await Notification.requestPermission()}catch(e){perm="default"}
+  if(perm!=="granted"){S.push=perm==="denied"?"denied":"off";render();toast("Du skal trykke Tillad for at få birdie-beskeder.");return}
+  try{
+    const {data:key,error}=await SB.rpc("push_public_key");if(error||!key)throw error||{message:"ingen nøgle"};
+    const reg=await navigator.serviceWorker.ready;
+    const sub=await reg.pushManager.getSubscription()||await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64u(key)});
+    const r=await SB.rpc("save_push",{p_sub:sub.toJSON()});if(r.error)throw r.error;
+    S.push="on";render();toast("Birdie-beskeder er slået til på denne telefon","ok");
+  }catch(e){toast("Kunne ikke slå beskeder til: "+(e?.message||"ukendt fejl"))}
+}
+async function pushOff(){
+  try{
+    const reg=await navigator.serviceWorker.ready;const sub=await reg.pushManager.getSubscription();
+    if(sub){await SB.rpc("delete_push",{p_endpoint:sub.endpoint});await sub.unsubscribe()}
+    S.push="off";render();toast("Birdie-beskeder er slået fra på denne telefon","ok");
+  }catch(e){toast("Kunne ikke slå beskeder fra: "+(e?.message||"ukendt fejl"))}
+}
+function pushCard(){
+  if(S.demo||!S.push||!myId())return "";
+  const body={
+    on:`<p class="muted">Slået til på denne telefon. Du får en besked, når en anden laver birdie eller bedre, også når appen er lukket.</p><button class="ghost" data-act="pushoff">Slå fra</button>`,
+    off:`<p class="muted">Få en besked på telefonen, når en anden laver birdie eller bedre, også når appen er lukket.</p><button class="btn" data-act="pushon">Slå birdie-beskeder til</button>`,
+    ios:`<p class="muted">På iPhone kræver beskeder, at appen ligger på hjemmeskærmen:</p><ol style="margin:6px 0 0;padding-left:20px"><li>Tryk på Del-knappen (firkant med pil op) nederst i Safari.</li><li>Vælg <strong>Føj til hjemmeskærm</strong> og tryk Tilføj.</li><li>Åbn Tirsdagsklubben fra hjemmeskærmen, log ind, og tryk <strong>Slå birdie-beskeder til</strong> her.</li></ol>`,
+    denied:`<p class="muted">Telefonen har blokeret beskeder fra appen. Slå dem til under telefonens Indstillinger → Notifikationer → Tirsdag (eller i browserens indstillinger for siden), og åbn appen igen.</p>`,
+    unsupported:`<p class="muted">Denne browser kan ikke vise beskeder. Du ser stadig birdies her i appen, mens den er åben.</p>`
+  }[S.push];
+  return body?`<div class="card"><h2>Birdie-beskeder</h2>${body}</div>`:"";
+}
 function birdieCard(r){
   const bs=birdieList(r).sort((a,b)=>a.d-b.d||pname(a.pid).localeCompare(pname(b.pid),"da")||a.h-b.h);
   if(!bs.length)return "";
@@ -888,6 +935,8 @@ document.addEventListener("click",ev=>{
   const a=el.dataset.act,r=currentRound();
   if(a==="board"){S.board=el.dataset.k;render()}
   else if(a==="open"){S.open=S.open===el.dataset.pid?null:el.dataset.pid;render()}
+  else if(a==="pushon"){pushOn()}
+  else if(a==="pushoff"){pushOff()}
   else if(a==="demo"){startDemo()}
   else if(a==="stopdemo"){stopDemo()}
   else if(a==="hole"){S.hole=Number(el.dataset.h);render();window.scrollTo({top:0})}
@@ -1080,7 +1129,9 @@ function makeDb(sb){
   const {data:{session}}=await SB.auth.getSession();
   S.user=session?.user||null;
   SB.auth.onAuthStateChange((ev,ses)=>{const u=ses?.user||null;const changed=(u?.id||null)!==(S.user?.id||null);S.user=u;if(u&&changed)start();render()});
+  if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
   if(S.user)await start();else{S.mode="live";render()}
+  pushInit();
 })();
 </script>
 
