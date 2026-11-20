@@ -173,7 +173,7 @@ button.sm{min-height:32px;padding:4px 10px;font-size:13px}
 <div id="banner"></div>
 <main class="wrap" id="view"><div class="card empty"><p class="muted">Henter runder…</p></div></main>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 48</p>
+<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 49</p>
 
 <script>
 /* ---------- Konfiguration (let at justere) ---------- */
@@ -427,7 +427,7 @@ let unsubEntries=null,entriesRid=null,loadTimer=null;
 const signupSubs={};
 function ensureSignupSubs(){
   if(!S.db||!S.periodsLoaded)return;
-  openTuesdays().concat(upcomingTrips().map(t=>t.id)).forEach(day=>{if(signupSubs[day])return;signupSubs[day]=S.db.collection(`signups/${day}/entries`).onSnapshot(snap=>{
+  signupDays().concat(upcomingTrips().map(t=>t.id)).forEach(day=>{if(signupSubs[day])return;signupSubs[day]=S.db.collection(`signups/${day}/entries`).onSnapshot(snap=>{
     const m={};snap.docs.forEach(d=>m[d.id]={...d.data(),id:d.id});LIVE.signups[day]=m;render();
   },()=>{})});
 }
@@ -645,7 +645,7 @@ function draftSel(day){
 function vSignup(){
   const me=myId(),adm=isAdmin();
   const members=Object.values(D().players).filter(p=>!p.guest).sort((a,b)=>a.name.localeCompare(b.name,"da"));
-  const cards=openTuesdays().map(day=>{
+  const cards=signupDays().map(day=>{
     const {members:ms,guests,free,open}=signupInfo(day);
     const n=ms.length+guests.length,isIn=me&&ms.some(e=>e.id===me);
     const go=guestOpensAt(day);
@@ -705,6 +705,10 @@ function calRow(key){
   return calDone().includes(key)?`<p class="small" style="margin:6px 0"><span class="chip">✓ Lagt i kalender</span> <button class="ghost sm" data-act="ics" data-day="${key}">Igen</button></p>`
     :`<p style="margin:6px 0"><button class="ghost sm" data-act="ics" data-day="${key}">📅 Læg i kalender</button></p>`;
 }
+// Tilmelding: de næste 3 tirsdage + kommende finaletirsdage (så man kan melde sig til finalerne i god tid)
+function signupDays(){const today=localIso(new Date());
+  const fin=periods().filter(p=>p.end>=today&&p.end>=APP_START).slice(0,1).flatMap(p=>{const n=Number(p.finales??2);return n>0?tuesdaysIn(p).slice(-n):[]}).filter(d=>d>=today);
+  return [...new Set(openTuesdays().concat(fin))].sort()}
 function upcomingTrips(){const today=localIso(new Date());return trips().filter(t=>t.end>=today)}
 function vEvents(){
   const me=myId(),adm=isAdmin(),ts=upcomingTrips();
@@ -721,6 +725,7 @@ function vEvents(){
       ${me&&!D().players[me]?.guest?(isIn?`<button data-act="unsign" data-day="${id}" data-id="${me}">Afmeld mig</button>`:`<button class="primary" data-act="sign" data-day="${id}">Tilmeld mig</button>`):""}</div>
       ${isIn?calRow(id):""}
       ${all.length?`<ol class="signlist">${list}</ol>`:`<p class="muted">Ingen tilmeldte endnu.</p>`}
+      ${adm?`<div class="row" style="margin-bottom:8px"><button class="ghost sm" data-act="tripedit" data-id="${id}">✏️ Ret</button>${S.confirmTripDel===id?`<span class="small">Slet ${esc(t.name)}?</span><button class="sm" data-act="tripnodel">Fortryd</button><button class="sm danger" data-act="tripdel" data-id="${id}">Ja, slet</button>`:`<button class="ghost sm" data-act="tripaskdel" data-id="${id}">🗑 Slet</button>`}</div>`:""}
       ${adm?`<div class="row"><select id="as-${id}" aria-label="Tilmeld medlem"><option value="">Tilmeld et medlem…</option>${members.filter(p=>!ms.some(e=>e.id===p.id)).map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join("")}</select></div>`:""}
       ${me||adm?`<div class="row" style="margin-top:8px"><label class="f" style="flex:1 1 140px">Gæstens navn<input id="gn-${id}" autocomplete="off" list="gl-${id}" placeholder="Skriv eller vælg"></label><datalist id="gl-${id}">${savedGuests().map(g=>`<option value="${esc(g.name)}">`).join("")}</datalist><label class="f">Handicap<input id="gh-${id}" inputmode="decimal" style="width:80px"></label><button data-act="addguest" data-day="${id}" style="align-self:end">Tilføj gæst</button></div>`:""}
     </div>`}).join("");
@@ -1284,6 +1289,7 @@ document.addEventListener("click",ev=>{
       const ti=$("#tt-"+d);const tv=ti?ti.value:t.times?.[d];if(tv)times[d]=tv});
     saveTrips(trips().map(o=>o.id===id?{...o,name,start,end,days,times}:o));
   }
+  else if(a==="tripedit"){S.tripOpen=el.dataset.id;S.forceView="runde";try{history.replaceState(null,"","#runde")}catch(e){}render();setTimeout(()=>document.getElementById("tn-"+el.dataset.id)?.scrollIntoView({block:"center"}),50)}
   else if(a==="tripaskdel"){S.confirmTripDel=el.dataset.id;render()}
   else if(a==="tripnodel"){S.confirmTripDel=null;render()}
   else if(a==="tripdel"){const id=el.dataset.id;S.tripOpen=null;S.confirmTripDel=null;saveTrips(trips().filter(t=>t.id!==id),"Turen er slettet")}
