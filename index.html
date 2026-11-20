@@ -173,7 +173,7 @@ button.sm{min-height:32px;padding:4px 10px;font-size:13px}
 <div id="banner"></div>
 <main class="wrap" id="view"><div class="card empty"><p class="muted">Henter runder…</p></div></main>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 47</p>
+<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 48</p>
 
 <script>
 /* ---------- Konfiguration (let at justere) ---------- */
@@ -748,6 +748,7 @@ function render(){
   $("#tabs").hidden=gate||claim||S.watch;
   $("#view").innerHTML=gate?vAuth():claim?vClaim():S.watch?`<div class="whobar row small"><span>👀 Du ser med som gæst. Siden opdaterer af sig selv.</span></div>`+(Object.keys(LIVE.rounds).length?f():emptyCard("Ingen runde lige nu","Når Tirsdagsklubben spiller, kan du følge stillingen her.","")):whoBar()+f();
   if(focus&&document.getElementById(focus)&&document.getElementById(focus).tagName==="INPUT")document.getElementById(focus).focus();
+  if(S.ce)checkCourseForm();
 }
 function emptyCard(title,text,btns){return `<div class="card empty"><h2>${title}</h2><p class="muted">${text}</p><div class="row" style="justify-content:center">${btns||""}</div></div>`}
 const demoBtn=()=>"";
@@ -1031,7 +1032,7 @@ function vCourses(){
     ${e.prov?`<p class="chip warn" style="margin:0 0 10px">Foreløbig: tjek tallene mod scorekortet, og tryk Godkend bane nederst.</p>`:""}
     <label class="f">Banens navn<input id="ce-name" value="${esc(e.name)}" placeholder="fx Great Northern"></label>
     <h3 style="margin-top:12px">Par pr. hul</h3>${grid("par","Par")}
-    <h3 style="margin-top:12px">Index pr. hul (1 er sværest)</h3>${grid("si","Index")}
+    <h3 style="margin-top:12px">Index pr. hul (1 er sværest)</h3>${grid("si","Index")}<p class="small" id="ce-sicheck" style="margin:0"></p>
     <h3 style="margin-top:12px">Tees (herrer)</h3>
     <p class="small muted" style="margin:0 0 6px">Står på scorekortet eller på DGU's sloperegistrering.</p><div style="display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:6px" class="small muted"><span>Tee</span><span>Course rating</span><span>Slope</span></div>
     ${e.tees.map((t,i)=>`<div style="display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:6px;margin-bottom:4px"><input id="ce-tn-${i}" value="${esc(t.n)}" placeholder="Tee, fx Gul" style="width:100%;min-width:0" aria-label="Tee navn"><input id="ce-tc-${i}" inputmode="decimal" value="${esc(t.cr)}" placeholder="CR, fx 70,5" style="width:100%;min-width:0" aria-label="Course rating"><input id="ce-ts-${i}" inputmode="numeric" value="${esc(t.slope)}" placeholder="Slope" style="width:100%;min-width:0" aria-label="Slope"></div>`).join("")}
@@ -1493,6 +1494,24 @@ document.addEventListener("click",ev=>{const a=ev.target.closest('#tabs a,a[href
 document.addEventListener("toggle",ev=>{if(ev.target.id==="selbox")S.selOpen=ev.target.open},true);
 
 
+// Tjek mens der tastes: par 3-6, index 1-18 og hvert tal kun én gang. Forkerte felter bliver røde.
+function checkCourseForm(){
+  if(!$("#ce-si-0"))return;
+  const bad="2px solid var(--warn)",sv=[],seen={};
+  for(let i=0;i<18;i++){const el=$("#ce-par-"+i),v=el.value.trim(),n=Number(v);el.style.outline=v&&!(Number.isInteger(n)&&n>=3&&n<=6)?bad:""}
+  for(let i=0;i<18;i++){const v=$("#ce-si-"+i).value.trim();sv.push(v);if(v)(seen[v]=seen[v]||[]).push(i)}
+  const probs=[];
+  sv.forEach((v,i)=>{const el=$("#ce-si-"+i),n=Number(v);let err="";
+    if(v&&!(Number.isInteger(n)&&n>=1&&n<=18))err=`Hul ${i+1}: ${v} er ikke et tal fra 1 til 18`;
+    else if(v&&seen[v].length>1)err=`Index ${v} står på hul ${seen[v].map(x=>x+1).join(" og ")}`;
+    el.style.outline=err?bad:"";if(err&&!probs.includes(err))probs.push(err)});
+  const used=new Set(sv.map(Number)),miss=Array.from({length:18},(_,i)=>i+1).filter(n=>!used.has(n));
+  const out=$("#ce-sicheck");if(!out)return;
+  if(probs.length)out.innerHTML=`<span style="color:var(--warn)">${probs.map(esc).join(". ")}.</span>`;
+  else if(sv.every(v=>v)&&!miss.length)out.innerHTML=`<span style="color:var(--ok)">✓ Index 1-18 er brugt én gang hver.</span>`;
+  else out.innerHTML=sv.some(v=>v)?`<span class="muted">Mangler: ${miss.join(", ")}</span>`:"";
+}
+document.addEventListener("input",ev=>{if(/^ce-(si|par)-/.test(ev.target.id||""))checkCourseForm()});
 document.addEventListener("input",ev=>{if(!/^ce-par-/.test(ev.target.id||""))return;
   const v=o=>{let t=0,n=0;for(let i=o;i<o+9;i++){const x=parseInt($("#ce-par-"+i)?.value);if(x>0){t+=x;n++}}return n?t:""};
   const a=v(0),b=v(9),set=(id,x)=>{const el=$("#"+id);if(el)el.textContent=x};
