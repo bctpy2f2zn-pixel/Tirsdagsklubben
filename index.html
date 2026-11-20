@@ -172,7 +172,7 @@ button.sm{min-height:32px;padding:4px 10px;font-size:13px}
 <div id="banner"></div>
 <main class="wrap" id="view"><div class="card empty"><p class="muted">Henter runder…</p></div></main>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 34</p>
+<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 35</p>
 
 <script>
 /* ---------- Konfiguration (let at justere) ---------- */
@@ -908,6 +908,8 @@ function vPlan(){
     <div style="display:grid;gap:10px">${items}</div>
     <div class="row" style="margin-top:12px"><button data-act="planadd">Ny sæson</button></div></div>`;
 }
+// Gæster der er gemt (har spillet før eller er tilføjet af administratoren), nyeste først
+function savedGuests(){return Object.entries(D().players).filter(([id,p])=>p.guest&&!p.hidden&&p.name).map(([id,p])=>({id,name:p.name,hi:p.hi??null,guest:true,at:p.at||0})).sort((a,b)=>a.name.localeCompare(b.name,"da"))}
 /* Ture og andre baner (kun administrator) */
 function myTeeCourses(){const today=localIso(new Date());const ids=new Set(Object.keys(COURSES_DEFAULT));trips().filter(t=>t.end>=today).forEach(t=>Object.values(t.days||{}).forEach(c=>c&&ids.add(c)));return [...ids].filter(id=>D().courses[id]||COURSES_DEFAULT[id])}
 function vTrips(){
@@ -1054,7 +1056,12 @@ function vRound(){
   const ps0=Object.values(D().players).filter(p=>!p.guest).sort((a,b)=>a.name.localeCompare(b.name,"da"));
   if(!ps0.length) return html+emptyCard("Tilføj spillere først","Før I kan starte en runde, skal gruppen være oprettet med navn og handicap.",`<a class="btn" href="#spillere">Gå til Spillere</a>${demoBtn()}`);
   const d=S.draft||(S.draft=newDraft(openTuesdays()[0]||nextTuesday()));
-  const ps=ps0.concat(signupInfo(d.date).guests.map(g=>({id:g.id,name:g.name+" (gæst)",hi:g.hi,guest:true})));
+  // Gæster: dagens tilmeldte gæster + gemte gæster fra tidligere (uden flueben, til de vælges). Samme navn vises kun én gang.
+  const dayG=signupInfo(d.date).guests.map(g=>({id:g.id,name:g.name,hi:g.hi,guest:true}));
+  const seen=new Set(dayG.map(g=>g.name.trim().toLowerCase()));
+  const savedG=savedGuests().filter(g=>{const k=g.name.trim().toLowerCase();if(seen.has(k))return false;seen.add(k);return true});
+  const gl=dayG.concat(savedG).map(g=>({...g,name:g.name+" (gæst)"}));
+  const ps=ps0.concat(gl);
   const hasSign=signupInfo(d.date).members.length>0;
   const sel=ps.filter(p=>d.sel[p.id]);
   const nfl=d.flights?Math.max(0,...Object.values(d.flights)):0,hist=d.flights?pairHistory(d.date):{};
@@ -1069,7 +1076,9 @@ function vRound(){
     ${isFinale({id:d.date})?`<p class="chip" style="margin:0 0 10px">Finale: ${seasonCfg().finaleMult} gange point</p>`:""}
     <div class="row" style="margin:6px 0 12px"><button class="primary" data-act="shuffle" ${sel.length<2?"disabled":""}>${d.flights?"Lav bolde igen":"Lav bolde"} (${sel.length} spillere)</button></div>
     <details id="selbox" ${S.selOpen||!hasSign?"open":""}><summary class="small" style="cursor:pointer;padding:6px 0"><strong>Hvem spiller? (${sel.length})</strong>${hasSign?` · udfyldt fra tilmeldingen til ${esc(fmtDate(d.date))}. Tryk for at rette.`:""}</summary>
-    <div class="chk">${ps.map(p=>`<label><input type="checkbox" id="sel-${p.id}" data-pid="${p.id}" ${d.sel[p.id]?"checked":""}> ${esc(p.name)}</label>`).join("")}</div></details>
+    <div class="chk">${ps.map(p=>`<label><input type="checkbox" id="sel-${p.id}" data-pid="${p.id}" ${d.sel[p.id]?"checked":""}> ${esc(p.name)}${p.guest&&p.hi!=null?` <span class="small muted">${String(p.hi).replace(".",",")}</span>`:""}</label>`).join("")}</div>
+    <div class="row" style="margin-top:8px"><label class="f" style="flex:1 1 140px">Ny gæst<input id="ng-name" placeholder="Navn" autocomplete="off"></label><label class="f">Handicap<input id="ng-hi" inputmode="decimal" style="width:80px" placeholder="fx 18,4"></label><button data-act="addsavedguest" style="align-self:end">Tilføj gæst</button></div>
+    <p class="note" style="margin-top:6px">Gæster bliver på listen til næste gang. Sæt flueben ved dem, der spiller med. Gæster tæller ikke i stillingen.</p></details>
     <div class="row" style="margin-top:14px"><span class="spacer"></span>${live?`<span class="small muted">Afslut den aktive runde ovenfor, før du starter en ny.</span>`:""}<button class="primary" data-act="start" ${live||!d.flights||sel.length<2?"disabled":""}>Start runde</button></div>
     ${fls?`<div class="flights" style="margin-top:12px">${fls}</div>`:`<p class="note">Tryk "Lav bolde", så fordeler appen spillerne i 4- og 3-bolde, så folk spiller med så mange forskellige som muligt i løbet af sæsonen.</p>`}
     ${tripOf(d.date)?`<p class="chip" style="margin:0 0 10px">${esc(tripOf(d.date).name)}: runden tæller i turens stilling</p>`:""}
@@ -1119,6 +1128,16 @@ document.addEventListener("click",ev=>{
   else if(a==="tripaskdel"){S.confirmTripDel=el.dataset.id;render()}
   else if(a==="tripnodel"){S.confirmTripDel=null;render()}
   else if(a==="tripdel"){const id=el.dataset.id;S.tripOpen=null;S.confirmTripDel=null;saveTrips(trips().filter(t=>t.id!==id),"Turen er slettet")}
+  else if(a==="addsavedguest"){
+    if(!isAdmin()){toast(ADMIN_ONLY);return}
+    const name=$("#ng-name").value.trim(),hi=parseFloat(($("#ng-hi").value||"").replace(",","."));
+    if(!name){toast("Skriv gæstens navn");return}
+    if(isNaN(hi)){toast("Skriv gæstens handicap, fx 18,4");return}
+    const old=savedGuests().find(g=>g.name.trim().toLowerCase()===name.toLowerCase());
+    if(Object.values(D().players).some(p=>!p.guest&&p.name.trim().toLowerCase()===name.toLowerCase())){toast(name+" er allerede medlem","err");return}
+    const id=old?old.id:"g-"+newId();S.selOpen=true;
+    safe(async()=>{await put("players/"+id,{name,hi,guest:true,active:false},!!old);if(S.draft){S.draft.sel[id]=true;S.draft.flights=null}render()},old?name+" er sat på med handicap "+String(hi).replace(".",","):name+" er tilføjet som gæst");
+  }
   else if(a==="ceopen"){S.ce=el.dataset.id?courseToEdit(el.dataset.id):blankCourse();render()}
   else if(a==="ceclose"){S.ce=null;render()}
   else if(a==="ceaddtee"){readCourseForm();S.ce.tees.push({n:"",cr:"",slope:""},{n:"",cr:"",slope:""});render()}
