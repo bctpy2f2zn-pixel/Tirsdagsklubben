@@ -173,7 +173,7 @@ button.sm{min-height:32px;padding:4px 10px;font-size:13px}
 <div id="banner"></div>
 <main class="wrap" id="view"><div class="card empty"><p class="muted">Henter runder…</p></div></main>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 51</p>
+<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 52</p>
 
 <script>
 /* ---------- Konfiguration (let at justere) ---------- */
@@ -665,7 +665,6 @@ function vSignup(){
       ${isIn?calRow(day):""}
       ${n?`<ol class="signlist">${list}</ol>`:`<p class="muted">Ingen tilmeldte endnu.</p>`}
       ${adm&&n>=2?`<div class="row" style="margin-bottom:8px"><button class="primary" data-act="gobolde" data-day="${day}">Lav bolde for denne dag</button></div>`:""}
-      ${adm?`<div class="row" style="margin-bottom:8px"><label class="small" style="display:flex;align-items:center;gap:8px">Første start <input type="time" id="st-${day}" value="${esc(startFor(day)||"")}" style="width:110px"></label></div>`:""}
       ${adm?`<div class="row"><select id="as-${day}" aria-label="Tilmeld medlem"><option value="">Tilmeld et medlem…</option>${members.filter(p=>!ms.some(e=>e.id===p.id)).map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join("")}</select></div>`:""}
       ${gst}
     </div>`;
@@ -1238,7 +1237,7 @@ function vRound(){
     <div class="row" style="margin:10px 0"><label class="f">Dato<input type="date" id="nr-date" value="${d.date}"></label>
     <label class="f">Bane<select id="nr-course">${courseIds().map(k=>`<option value="${k}" ${k===d.course?"selected":""}>${esc(course(k).name)}</option>`).join("")}</select></label>
     <label class="f">Tee for gæster og spillere uden valg<select id="nr-tee">${Object.entries(course(d.course).tees||{}).map(([t,v])=>`<option value="${t}" ${t===(d.tee||course(d.course).defaultTee)?"selected":""}>${t} (CR ${String(v.cr).replace(".",",")} / slope ${v.slope})</option>`).join("")}</select></label>
-    ${startFor(d.date)?`<p class="small muted">Første start kl. ${esc(startFor(d.date))} (rettes under Tilmeld)</p>`:""}
+    <label class="f">Første start<input type="time" id="nr-start" value="${esc(startFor(d.date)||"")}" style="width:110px"></label>
     <label class="f">Dagens match<select id="nr-match">${Object.entries(MATCH).map(([k,l])=>`<option value="${k}" ${k===d.match?"selected":""}>${l}</option>`).join("")}</select></label></div>
     <label class="row small" style="margin-bottom:10px"><input type="checkbox" id="nr-counts" ${d.counts?"checked":""}> Tæller i sæsonstillingen (altid som stableford)</label>
     ${isFinale({id:d.date})?`<p class="chip" style="margin:0 0 10px">Finale: ${seasonCfg().finaleMult} gange point</p>`:""}
@@ -1473,7 +1472,9 @@ document.addEventListener("change",ev=>{
   }
   else if(el.id==="nr-date"){const t0=S.draft.tee,c0=S.draft.course;S.draft={...newDraft(el.value),course:dayCourse(el.value)||c0,match:S.draft.match};S.draft.tee=S.draft.course===c0?t0:null;render()}
   else if((el.id||"").startsWith("as-")){if(!isAdmin()||!el.value)return;const day=el.id.slice(3);safe(()=>put(`signups/${day}/entries/${el.value}`,{guest:false,at:Date.now()}),pname(el.value)+" er tilmeldt")}
-  else if(el.id==="nr-course"){S.draft.course=el.value;S.draft.tee=null;render()}
+  else if(el.id==="nr-course"){S.draft.course=el.value;S.draft.tee=null;render();
+    // Banen gemmes på dagen, så Tilmeld viser den (ikke for turdage, de har egen bane pr. dag)
+    const day=S.draft.date;if(isAdmin()&&!tripOf(day)&&courseFor(day)!==el.value){const sch=D().config?.schedule||{};safe(()=>put("config/schedule",{...sch,dates:{...(sch.dates||{}),[day]:el.value}}),"Bane gemt for "+fmtDate(day))}}
   else if(el.id==="nr-match"){S.draft.match=el.value}
   else if(el.id==="nr-tee"){S.draft.tee=el.value}
   else if(el.id==="my-tee"){const r=currentRound(),me=myId();if(!r||!me)return;safe(()=>put("rounds/"+r.id,{tees:{...(r.tees||{}),[me]:el.value}},true),"Tee gemt for i dag")}
@@ -1484,7 +1485,7 @@ document.addEventListener("change",ev=>{
   else if((el.id||"").startsWith("kind-")){if(!isAdmin()){toast(ADMIN_ONLY);render();return}const pid=el.dataset.pid,g=el.value==="g";
     safe(()=>put("players/"+pid,{guest:g,active:!g},true),pname(pid)+(g?" er nu gæst":" er nu medlem"))}
   else if(el.id==="per-sel"){S.period=el.value;render()}
-  else if((el.id||"").startsWith("st-")){if(!isAdmin())return;const day=el.id.slice(3);clearTimeout(S.stT);
+  else if(el.id==="nr-start"){if(!isAdmin())return;const day=S.draft.date;clearTimeout(S.stT);
     // iPhone sender "change" for hvert hjul-tryk: gem først når tiden har ligget stille, og kun hvis den er ændret
     S.stT=setTimeout(()=>{if((el.value||null)!==(startFor(day)||null))saveStart(day,el.value)},1200)}
   else if((el.id||"").startsWith("sc-")){
