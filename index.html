@@ -179,7 +179,7 @@ button.sm{min-height:32px;padding:4px 10px;font-size:13px}
 <div id="banner"></div>
 <main class="wrap" id="view"><div class="card empty"><p class="muted">Henter runder…</p></div></main>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 58</p>
+<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 59</p>
 
 <script>
 /* ---------- Konfiguration (let at justere) ---------- */
@@ -295,8 +295,8 @@ function flightStatus(r,fl){
   const need=Math.min(2,mates.length);
   return {mates,ready,by,need,mk,approved:ready&&mk.length>=need&&by.length>=need};
 }
-function calc(c,hi,hv){
-  const ph=playingHcp(hi,c);
+function calc(c,hi,hv,phOver){
+  const ph=phOver!=null?phOver:playingHcp(hi,c);
   let thru=0,gross=0,par=0,stb=0,net=0,conflicts=0,unconf=0;const hs=Array(18).fill(0);
   hv.forEach((x,h)=>{
     if(x.st==="conflict"){conflicts++;return}
@@ -310,7 +310,8 @@ function calc(c,hi,hv){
 }
 function playerTotals(r,pid){
   const hi=(r.hcp&&r.hcp[pid]!=null)?r.hcp[pid]:(D().players[pid]?.hi??0);
-  return {pid,...calc(courseR(r.course,teeOf(r,pid)),hi,holeVals(r,pid))};
+  // r.ph[pid]: spillehandicap rettet af administrator/turneringsleder for denne runde
+  return {pid,...calc(courseR(r.course,teeOf(r,pid)),hi,holeVals(r,pid),r.ph?.[pid]??null),phFixed:r.ph?.[pid]!=null};
 }
 function ranked(list,key,dir){
   const played=list.filter(t=>t.thru>0), rest=list.filter(t=>t.thru===0);
@@ -909,7 +910,7 @@ function vEnter0(){
   const strip=Array.from({length:18},(_,i)=>`<button data-act="hole" data-h="${i+1}" class="${holeState(i)} ${i===h?"cur":""}" aria-label="Hul ${i+1}">${i+1}</button>`).join("");
   const pls=mates.map(p=>{
     const v=mine.scores[p]?.[h];
-    const ph=playingHcp((r.hcp?.[p]??D().players[p]?.hi??0),courseR(r.course,teeOf(r,p))),s=strokesOn(ph,c.si[h]);
+    const ph=r.ph?.[p]??playingHcp((r.hcp?.[p]??D().players[p]?.hi??0),courseR(r.course,teeOf(r,p))),s=strokesOn(ph,c.si[h]);
     const diff=others.map(o=>({by:o.by,v:o.scores?.[p]?.[h]})).filter(o=>o.v>0&&v>0&&o.v!==v);
     const conf1=v>0&&!diff.length?(needM<2||others.some(o=>o.scores?.[p]?.[h]===v)?"ok":"one"):"";
     return `<div class="pl ${diff.length?"c":conf1}">
@@ -1233,7 +1234,7 @@ function vRound(){
   if(live){
     const nf=Math.max(...Object.values(r.flights||{1:1}));
     const fst=n=>{const st=flightStatus(r,n);return (st.mk.length?` <span class="small muted" style="font-weight:400;text-transform:none;letter-spacing:0">Markører: ${st.mk.map(b=>esc(pname(b))).join(", ")} <button class="ghost sm" data-act="resetmarkers" data-fl="${n}">Nulstil</button></span>`:` <span class="small muted" style="font-weight:400;text-transform:none;letter-spacing:0">Ingen markører endnu</span>`)+(st.approved?` <span class="chip" style="font-size:12px">✓ Godkendt</span>`:` <span class="chip" style="font-size:12px;opacity:.75">Ikke godkendt</span>`)};
-    const fl=Array.from({length:nf},(_,i)=>i+1).map(n=>`<div class="flight"><h3>Bold ${n}${fst(n)}</h3>${(r.players||[]).filter(p=>r.flights[p]===n).map(p=>`<div class="row" style="justify-content:space-between;margin:4px 0"><span>${esc(pname(p))}</span>${adm?`<select id="fl-${p}" data-act="moveflight" data-pid="${p}" aria-label="Flyt ${esc(pname(p))} til bold">${Array.from({length:nf+1},(_,i)=>`<option value="${i+1}" ${i+1===n?"selected":""}>Bold ${i+1}</option>`).join("")}</select>`:""}</div>`).join("")}</div>`).join("");
+    const fl=Array.from({length:nf},(_,i)=>i+1).map(n=>`<div class="flight"><h3>Bold ${n}${fst(n)}</h3>${(r.players||[]).filter(p=>r.flights[p]===n).map(p=>`<div class="row" style="justify-content:space-between;margin:4px 0"><span>${esc(pname(p))}</span>${adm?(()=>{const t=playerTotals(r,p),auto=playingHcp(t.hi,courseR(r.course,teeOf(r,p)));return `<label class="small" style="display:flex;align-items:center;gap:4px;margin-left:auto;margin-right:6px">Spillehcp<input id="phc-${p}" data-pid="${p}" inputmode="numeric" enterkeyhint="done" value="${t.phFixed?t.ph:""}" placeholder="${auto}" style="width:52px;text-align:center;padding:4px;${t.phFixed?"border-color:var(--flag);font-weight:700":""}" aria-label="Spillehandicap for ${esc(pname(p))}" title="Tomt felt = beregnet (${auto})"></label>`})():""}${adm?`<select id="fl-${p}" data-act="moveflight" data-pid="${p}" aria-label="Flyt ${esc(pname(p))} til bold">${Array.from({length:nf+1},(_,i)=>`<option value="${i+1}" ${i+1===n?"selected":""}>Bold ${i+1}</option>`).join("")}</select>`:""}</div>`).join("")}</div>`).join("");
     const cf=conflictList(r).length;
     const nap=[...new Set(Object.values(r.flights||{}))].filter(n=>!flightStatus(r,n).approved).length;
     html+=`<div class="card"><div class="row"><h2>Aktiv runde</h2><span class="chip"><span class="live-dot"></span>Live</span></div>
@@ -1513,6 +1514,10 @@ document.addEventListener("change",ev=>{
   else if((el.id||"").startsWith("kind-")){if(!isOwner()){toast(OWNER_ONLY);render();return}const pid=el.dataset.pid,v=el.value,g=v==="g";
     safe(()=>put("players/"+pid,{guest:g,active:!g,coadmin:v==="c"},true),pname(pid)+(g?" er nu gæst":v==="c"?" er nu turneringsleder":" er nu medlem"))}
   else if(el.id==="per-sel"){S.period=el.value;render()}
+  else if((el.id||"").startsWith("phc-")){if(!isAdmin()){toast(ADMIN_ONLY);render();return}const r=currentRound(),pid=el.dataset.pid,v=el.value.trim();if(!r)return;
+    if(v&&!/^-?\d{1,2}$/.test(v)){toast("Spillehandicap skal være et helt tal, fx 14","err");render();return}
+    const ph={...(r.ph||{})};if(v)ph[pid]=Number(v);else delete ph[pid];
+    safe(()=>put("rounds/"+r.id,{ph},true),v?`Spillehandicap for ${pname(pid)} er sat til ${v}`:`${pname(pid)} bruger igen det beregnede spillehandicap`)}
   else if(el.id==="nr-start"){if(!isAdmin())return;const day=S.draft.date;clearTimeout(S.stT);
     // iPhone sender "change" for hvert hjul-tryk: gem først når tiden har ligget stille, og kun hvis den er ændret
     S.stT=setTimeout(()=>{if((el.value||null)!==(startFor(day)||null))saveStart(day,el.value)},1200)}
