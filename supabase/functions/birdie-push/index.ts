@@ -48,8 +48,11 @@ Deno.serve(async (req) => {
   const found: { rid: string; pid: string; hole: number; score: number; d: number }[] = [];
   for (const pid of r.players || []) {
     const fl = r.flights?.[pid];
-    // Markører: de to første i bolden, der har meldt sig. Kun deres tal tæller (som i appen).
-    const mk = entries.filter((e) => e.flight === fl && e.marker)
+    // Markører: de to første i bolden, der har meldt sig og ikke er meldt ude (Skift markør). Kun deres tal tæller (som i appen).
+    const cand = entries.filter((e) => e.flight === fl && e.marker);
+    const out = new Set<string>();
+    cand.forEach((e) => (e.drop || []).forEach((p: string) => { if (p !== e.by) out.add(p); }));
+    const mk = cand.filter((e) => !out.has(e.by))
       .sort((a, b) => (a.markerAt || 0) - (b.markerAt || 0)).slice(0, 2).map((e) => e.by);
     const mine = entries.filter((e) => e.flight === fl && e.scores && e.scores[pid] && (!mk.length || mk.includes(e.by)));
     for (let h = 0; h < 18; h++) {

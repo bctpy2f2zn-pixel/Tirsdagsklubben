@@ -259,8 +259,11 @@ function strokesOn(ph,si){
 }
 function playingHcp(hi,c){return Math.round(hi*c.slope/113+(c.cr-sum(c.par)))}
 // Markører: de to første i bolden, der har meldt sig (entry.marker). Kun deres tal tæller.
+// "Skift markør": en markør kan melde makker-markøren ude (entry.drop), fx hvis makkeren går hjem.
 function markersOf(r,fl){
-  return Object.values(D().entries[r.id]||{}).filter(e=>e.flight===fl&&e.marker).sort((a,b)=>(a.markerAt||0)-(b.markerAt||0)).slice(0,2).map(e=>e.by);
+  const es=Object.values(D().entries[r.id]||{}).filter(e=>e.flight===fl&&e.marker);
+  const out=new Set();es.forEach(e=>(e.drop||[]).forEach(p=>{if(p!==e.by)out.add(p)}));
+  return es.filter(e=>!out.has(e.by)).sort((a,b)=>(a.markerAt||0)-(b.markerAt||0)).slice(0,2).map(e=>e.by);
 }
 function holeVals(r,pid){
   const fl=r.flights?.[pid],mk=markersOf(r,fl);
@@ -821,6 +824,8 @@ function vEnter(){
       return `<div class="card ${st.approved?"":""}"><h3>Scorekort for bold ${fl}</h3>
       <p class="small muted" style="margin:0 0 10px">${st.approved?`<strong style="color:var(--ok,#1f7a4d)">✓ Scorekortet er godkendt.</strong> `:st.ready?"Alle huller er ens hos jer to markører. ":"Godkend kan først bruges, når I to markører har tastet alle 18 huller for alle spillerne, og der ikke er afvigelser. "}${who} Ændrer nogen en score bagefter, skal der godkendes igen.</p>
       ${mineOk?`<span class="chip">Du har godkendt</span>`:`<button class="primary" data-act="approve" ${st.ready?"":"disabled"}>Godkend scorekort</button>`}</div>`})()}
+    ${(()=>{const other=mk.find(b=>b!==me);if(!other)return mk.length<needM?`<div class="card"><h3>Skift markør</h3><p class="small muted" style="margin:0">Du er eneste markør lige nu. En anden i bolden kan trykke "Jeg er markør" under Indtast. De huller, du har tastet, bliver fyldt ud hos dem, så de bare skal tjekke dem.</p></div>`:"";
+      return `<div class="card"><h3>Skift markør</h3>${S.swapAsk?`<p class="small" style="margin:0 0 10px">Er ${esc(pname(other))} gået hjem? Så tæller ${esc(pname(other))}s tal ikke længere, og en anden i bolden kan blive markør i stedet.</p><div class="row"><button class="primary" data-act="swapmarker">Ja, skift markør</button><button class="ghost" data-act="swapask">Annuller</button></div>`:`<p class="small muted" style="margin:0 0 10px">Hvis ${esc(pname(other))} må gå hjem under runden, kan en anden i bolden overtage som markør.</p><button data-act="swapask">Skift markør</button>`}</div>`})()}
     <div class="card"><label class="f">Din tee i dag<select id="my-tee">${Object.entries(c.tees||{}).map(([t,v])=>`<option value="${t}" ${t===teeOf(r,me)?"selected":""}>${t} (CR ${String(v.cr).replace(".",",")} / slope ${v.slope})</option>`).join("")}</select></label>${picker}<p class="note">Bold ${fl} · ${esc(c.name)}. Du kan kun taste for din egen bold. Tryk på tallet for at sætte par.</p></div>`;
 }
 
@@ -863,6 +868,7 @@ function guideCard(){
     "Vælg din tee for dagen samme sted.",
     "Tast slag pr. hul. Tryk på tallet for at sætte par med det samme.",
     "Taster de to markører forskelligt på et hul, bliver hullet rødt hos alle, og det tæller ikke, før det er rettet.",
+    "Må en markør gå hjem under runden, trykker den anden markør <strong>Skift markør</strong>. Så kan en anden i bolden trykke \"Jeg er markør\" og får de spillede huller fyldt ud, så de bare skal tjekkes.",
     "Efter hul 18 trykker begge markører <strong>Godkend scorekort</strong>. Det kan først lade sig gøre, når alle huller er ens hos dem begge."])}
   ${sec("Live",[
     "Leaderboardet opdaterer sig selv, mens der tastes. Skift mellem stableford, slag brutto og slag netto.",
@@ -1215,9 +1221,23 @@ document.addEventListener("click",ev=>{
     const r=currentRound(),me=myId();if(!r||!me||!r.flights?.[me])return;
     const fl=r.flights[me],mates=(r.players||[]).filter(p=>r.flights[p]===fl);
     if(markersOf(r,fl).length>=Math.min(2,mates.length)){toast("Bolden har allerede to markører.","err");render();return}
+    if(Object.values(D().entries[r.id]||{}).some(o=>o.flight===fl&&o.marker&&o.by!==me&&(o.drop||[]).includes(me))){toast("Du er meldt ude som markør i dag. En anden i bolden må overtage.","err");return}
     const all=D().entries[r.id]||(D().entries[r.id]={});
-    const e={...clone(all[me]||{by:me,flight:fl,scores:{}}),by:me,flight:fl,marker:true,markerAt:Date.now()};
+    const e={...clone(all[me]||{by:me,flight:fl,scores:{}}),by:me,flight:fl,marker:true,markerAt:Date.now(),drop:[],approved:false};
+    // Ny markør midt i runden: de huller den anden markør allerede har tastet, fyldes ud, så de bare skal tjekkes
+    const cur=markersOf(r,fl).map(b=>all[b]).filter(Boolean)[0];
+    if(cur)mates.forEach(p=>{const src=cur.scores?.[p]||[];const dst=e.scores[p]=(e.scores[p]||[]).slice();for(let h=0;h<18;h++)if(!(dst[h]>0)&&src[h]>0)dst[h]=src[h]});
     all[me]=e;render();if(!S.demo)queueSave(r.id,me,e);toast("Du er markør for bold "+fl,"ok");
+  }
+  else if(a==="swapask"){S.swapAsk=!S.swapAsk;render()}
+  else if(a==="swapmarker"){
+    const r=currentRound(),me=myId();if(!r||!me||!r.flights?.[me])return;
+    const fl=r.flights[me],mk=markersOf(r,fl),other=mk.find(b=>b!==me);
+    if(!mk.includes(me)||!other){S.swapAsk=false;render();return}
+    const all=D().entries[r.id]||(D().entries[r.id]={});
+    const e={...clone(all[me]),drop:[...new Set([...(all[me].drop||[]),other])],approved:false};
+    all[me]=e;S.swapAsk=false;render();if(!S.demo)queueSave(r.id,me,e);
+    toast(pname(other)+" er ikke længere markør. Den nye markør trykker nu \"Jeg er markør\" under Indtast.","ok");
   }
   else if(a==="resetmarkers"){
     const r=currentRound();if(!isAdmin()||!r)return;const fl=Number(el.dataset.fl);
