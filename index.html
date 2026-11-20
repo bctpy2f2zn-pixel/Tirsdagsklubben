@@ -179,7 +179,7 @@ button.sm{min-height:32px;padding:4px 10px;font-size:13px}
 <div id="banner"></div>
 <main class="wrap" id="view"><div class="card empty"><p class="muted">Henter runder…</p></div></main>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 57</p>
+<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 58</p>
 
 <script>
 /* ---------- Konfiguration (let at justere) ---------- */
@@ -1058,17 +1058,17 @@ function vCourses(){
   const list=own.map(id=>{const c=course(id);return `<div class="row" style="justify-content:space-between;margin:4px 0"><span><strong>${esc(c.name)}</strong> <span class="small muted">par ${sum(c.par||[])} · ${Object.keys(c.tees||{}).length} tees${c.provisional?" · foreløbig":""}</span></span><button class="sm" data-act="ceopen" data-id="${id}">Ret</button></div>`}).join("");
   // Par får en sum for ud (1-9), hjem (10-18) og i alt, som opdateres mens man taster
   const parSum=o=>{const v=e.par.slice(o,o+9).map(x=>parseInt(x)).filter(x=>x>0);return v.length?sum(v):""};
-  const grid=(k,lab)=>[0,9].map(o=>`<div style="display:grid;grid-template-columns:44px repeat(9,1fr)${k==="par"?" 30px":""};gap:3px;margin-bottom:4px;align-items:center"><span class="small muted">${o?"Hul 10-18":"Hul 1-9"}</span>${Array.from({length:9},(_,i)=>`<input id="ce-${k}-${o+i}" inputmode="numeric" aria-label="${lab} hul ${o+i+1}" placeholder="${o+i+1}" value="${esc(e[k][o+i])}" style="width:100%;min-width:0;padding:6px 2px;text-align:center">`).join("")}${k==="par"?`<strong id="ce-sum-${o}" style="text-align:center" title="${o?"Hjem":"Ud"}">${parSum(o)}</strong>`:""}</div>`).join("")+(k==="par"?`<p class="small" style="margin:0;text-align:right">Ud <strong id="ce-sumo">${parSum(0)||"–"}</strong> · Hjem <strong id="ce-sumi">${parSum(9)||"–"}</strong> · Par i alt <strong id="ce-sumt">${(parSum(0)||0)+(parSum(9)||0)||"–"}</strong></p>`:"");
+  const grid=(k,lab)=>[0,9].map(o=>`<div style="display:grid;grid-template-columns:44px repeat(9,1fr)${k==="par"?" 30px":""};gap:3px;margin-bottom:4px;align-items:center"><span class="small muted">${o?"Hul 10-18":"Hul 1-9"}</span>${Array.from({length:9},(_,i)=>`<input id="ce-${k}-${o+i}" inputmode="numeric" enterkeyhint="next" aria-label="${lab} hul ${o+i+1}" placeholder="${o+i+1}" value="${esc(e[k][o+i])}" style="width:100%;min-width:0;padding:6px 2px;text-align:center">`).join("")}${k==="par"?`<strong id="ce-sum-${o}" style="text-align:center" title="${o?"Hjem":"Ud"}">${parSum(o)}</strong>`:""}</div>`).join("")+(k==="par"?`<p class="small" style="margin:0;text-align:right">Ud <strong id="ce-sumo">${parSum(0)||"–"}</strong> · Hjem <strong id="ce-sumi">${parSum(9)||"–"}</strong> · Par i alt <strong id="ce-sumt">${(parSum(0)||0)+(parSum(9)||0)||"–"}</strong></p>`:"");
   const form=e?`<div class="flight" style="margin-top:10px">
     <div style="margin-bottom:10px"><label class="btn" style="display:inline-block;cursor:pointer">📷 Læs scorekort fra foto<input type="file" accept="image/*" id="ce-photo" style="display:none"></label>
     <p class="small muted" style="margin:6px 0 0">Tag et skarpt billede lige ovenfra af rækkerne med par og hcp/index. Telefonen læser tallene selv (gratis). Tjek dem bagefter.${S.ocrBusy?` <strong>${esc(S.ocrBusy)}</strong>`:""}</p></div>
     ${e.prov?`<p class="chip warn" style="margin:0 0 10px">Foreløbig: tjek tallene mod scorekortet, og tryk Godkend bane nederst.</p>`:""}
-    <label class="f">Banens navn<input id="ce-name" value="${esc(e.name)}" placeholder="fx Great Northern"></label>
+    <label class="f">Banens navn<input id="ce-name" enterkeyhint="next" value="${esc(e.name)}" placeholder="fx Great Northern"></label>
     <h3 style="margin-top:12px">Par pr. hul</h3>${grid("par","Par")}
     <h3 style="margin-top:12px">Index pr. hul (1 er sværest)</h3>${grid("si","Index")}<p class="small" id="ce-sicheck" style="margin:0"></p>
     <h3 style="margin-top:12px">Tees (herrer)</h3>
     <p class="small muted" style="margin:0 0 6px">Står på scorekortet eller på DGU's sloperegistrering.</p><div style="display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:6px" class="small muted"><span>Tee</span><span>Course rating</span><span>Slope</span></div>
-    ${e.tees.map((t,i)=>`<div style="display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:6px;margin-bottom:4px"><input id="ce-tn-${i}" value="${esc(t.n)}" placeholder="Tee, fx Gul" style="width:100%;min-width:0" aria-label="Tee navn"><input id="ce-tc-${i}" inputmode="decimal" value="${esc(t.cr)}" placeholder="CR, fx 70,5" style="width:100%;min-width:0" aria-label="Course rating"><input id="ce-ts-${i}" inputmode="numeric" value="${esc(t.slope)}" placeholder="Slope" style="width:100%;min-width:0" aria-label="Slope"></div>`).join("")}
+    ${e.tees.map((t,i)=>`<div style="display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:6px;margin-bottom:4px"><input id="ce-tn-${i}" enterkeyhint="next" value="${esc(t.n)}" placeholder="Tee, fx Gul" style="width:100%;min-width:0" aria-label="Tee navn"><input id="ce-tc-${i}" inputmode="decimal" enterkeyhint="next" value="${esc(t.cr)}" placeholder="CR, fx 70,5" style="width:100%;min-width:0" aria-label="Course rating"><input id="ce-ts-${i}" inputmode="numeric" enterkeyhint="next" value="${esc(t.slope)}" placeholder="Slope" style="width:100%;min-width:0" aria-label="Slope"></div>`).join("")}
     <button class="sm ghost" data-act="ceaddtee">Flere tees</button>
     <label class="f" style="margin-top:10px">Standard-tee (navnet på den tee de fleste spiller)<input id="ce-def" value="${esc(e.def)}" style="width:140px"></label>
     <div class="row" style="margin-top:12px"><button class="primary" data-act="cesave">${e.prov?"✓ Godkend bane":"Gem bane"}</button><button class="ghost" data-act="ceclose">Fortryd</button>${e.id?`<span class="spacer"></span><button class="ghost sm" data-act="cehide">Fjern bane</button>`:""}</div>
@@ -1555,6 +1555,13 @@ function checkCourseForm(){
   else out.innerHTML=sv.some(v=>v)?`<span class="muted">Mangler: ${miss.join(", ")}</span>`:"";
 }
 document.addEventListener("input",ev=>{if(/^ce-(si|par)-/.test(ev.target.id||""))checkCourseForm()});
+// Banedata: Enter/"Næste" hopper til næste felt, og der hoppes selv videre når tallet er færdigt
+function ceNext(el){const all=[...document.querySelectorAll('input[id^="ce-"]:not([type=file])')],i=all.indexOf(el);const n=all[i+1];if(n){n.focus();n.select?.()}else el.blur()}
+document.addEventListener("keydown",ev=>{const id=ev.target.id||"";if(ev.key!=="Enter"||!id.startsWith("ce-")||ev.target.type==="file")return;ev.preventDefault();ceNext(ev.target)});
+document.addEventListener("focusin",ev=>{const id=ev.target.id||"";if(/^ce-(par|si|tc|ts)-/.test(id))ev.target.select?.()});
+document.addEventListener("input",ev=>{const el=ev.target,id=el.id||"",v=(el.value||"").trim();if(ev.inputType&&!ev.inputType.startsWith("insert"))return;
+  const done=/^ce-par-/.test(id)?/^[3-6]$/.test(v):/^ce-si-/.test(id)?/^(1[0-8]|[2-9])$/.test(v):/^ce-ts-/.test(id)?/^\d{3}$/.test(v):/^ce-tc-/.test(id)?/^\d{2}[.,]\d$/.test(v):false;
+  if(done)setTimeout(()=>ceNext(el),60)});
 document.addEventListener("input",ev=>{if(!/^ce-par-/.test(ev.target.id||""))return;
   const v=o=>{let t=0,n=0;for(let i=o;i<o+9;i++){const x=parseInt($("#ce-par-"+i)?.value);if(x>0){t+=x;n++}}return n?t:""};
   const a=v(0),b=v(9),set=(id,x)=>{const el=$("#"+id);if(el)el.textContent=x};
