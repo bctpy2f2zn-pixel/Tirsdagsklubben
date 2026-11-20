@@ -173,7 +173,7 @@ button.sm{min-height:32px;padding:4px 10px;font-size:13px}
 <div id="banner"></div>
 <main class="wrap" id="view"><div class="card empty"><p class="muted">Henter runder…</p></div></main>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 46</p>
+<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 47</p>
 
 <script>
 /* ---------- Konfiguration (let at justere) ---------- */
@@ -1017,7 +1017,7 @@ function vTrips(){
 }
 function saveTrips(list,msg){return safe(()=>put("config/trips",{list}),msg||"Turen er gemt")}
 function blankCourse(){return {id:null,name:"",par:Array(18).fill(""),si:Array(18).fill(""),tees:[{n:"",cr:"",slope:""},{n:"",cr:"",slope:""},{n:"",cr:"",slope:""}],def:"",note:""}}
-function courseToEdit(id){const c=course(id);return {id,name:c.name,par:c.par.slice(),si:c.si.slice(),tees:Object.entries(c.tees||{}).map(([n,v])=>({n,cr:String(v.cr).replace(".",","),slope:String(v.slope)})).concat([{n:"",cr:"",slope:""}]),def:c.defaultTee||"",note:c.note||""}}
+function courseToEdit(id){const c=course(id);return {prov:!!c.provisional,id,name:c.name,par:c.par.slice(),si:c.si.slice(),tees:Object.entries(c.tees||{}).map(([n,v])=>({n,cr:String(v.cr).replace(".",","),slope:String(v.slope)})).concat([{n:"",cr:"",slope:""}]),def:c.defaultTee||"",note:c.note||""}}
 function vCourses(){
   const own=Object.keys(D().courses||{}).filter(id=>!COURSES_DEFAULT[id]&&!course(id).hidden);
   const e=S.ce;
@@ -1028,6 +1028,7 @@ function vCourses(){
   const form=e?`<div class="flight" style="margin-top:10px">
     <div style="margin-bottom:10px"><label class="btn" style="display:inline-block;cursor:pointer">📷 Læs scorekort fra foto<input type="file" accept="image/*" id="ce-photo" style="display:none"></label>
     <p class="small muted" style="margin:6px 0 0">Tag et skarpt billede lige ovenfra af rækkerne med par og hcp/index. Telefonen læser tallene selv (gratis). Tjek dem bagefter.${S.ocrBusy?` <strong>${esc(S.ocrBusy)}</strong>`:""}</p></div>
+    ${e.prov?`<p class="chip warn" style="margin:0 0 10px">Foreløbig: tjek tallene mod scorekortet, og tryk Godkend bane nederst.</p>`:""}
     <label class="f">Banens navn<input id="ce-name" value="${esc(e.name)}" placeholder="fx Great Northern"></label>
     <h3 style="margin-top:12px">Par pr. hul</h3>${grid("par","Par")}
     <h3 style="margin-top:12px">Index pr. hul (1 er sværest)</h3>${grid("si","Index")}
@@ -1036,7 +1037,7 @@ function vCourses(){
     ${e.tees.map((t,i)=>`<div style="display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:6px;margin-bottom:4px"><input id="ce-tn-${i}" value="${esc(t.n)}" placeholder="Tee, fx Gul" style="width:100%;min-width:0" aria-label="Tee navn"><input id="ce-tc-${i}" inputmode="decimal" value="${esc(t.cr)}" placeholder="CR, fx 70,5" style="width:100%;min-width:0" aria-label="Course rating"><input id="ce-ts-${i}" inputmode="numeric" value="${esc(t.slope)}" placeholder="Slope" style="width:100%;min-width:0" aria-label="Slope"></div>`).join("")}
     <button class="sm ghost" data-act="ceaddtee">Flere tees</button>
     <label class="f" style="margin-top:10px">Standard-tee (navnet på den tee de fleste spiller)<input id="ce-def" value="${esc(e.def)}" style="width:140px"></label>
-    <div class="row" style="margin-top:12px"><button class="primary" data-act="cesave">Gem bane</button><button class="ghost" data-act="ceclose">Fortryd</button>${e.id?`<span class="spacer"></span><button class="ghost sm" data-act="cehide">Fjern bane</button>`:""}</div>
+    <div class="row" style="margin-top:12px"><button class="primary" data-act="cesave">${e.prov?"✓ Godkend bane":"Gem bane"}</button><button class="ghost" data-act="ceclose">Fortryd</button>${e.id?`<span class="spacer"></span><button class="ghost sm" data-act="cehide">Fjern bane</button>`:""}</div>
     ${e.note?`<p class="note">${esc(e.note)}</p>`:""}
   </div>`:"";
   return `<div class="card"><h2>Andre baner</h2><p class="small muted">Old og New Course ligger fast i appen. Her opretter du andre baner til ture. Appen bruger par, index, course rating og slope til at regne spillehandicap og stableford præcis som hjemme.</p>
@@ -1301,7 +1302,7 @@ document.addEventListener("click",ev=>{
   else if(a==="cesave"){
     const c=courseFromForm();if(typeof c==="string"){toast(c,"err");return}
     let id=S.ce.id;if(!id){id=c.name.toLowerCase().replace(/æ/g,"ae").replace(/ø/g,"oe").replace(/å/g,"aa").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")||"bane";if(COURSES_DEFAULT[id]||D().courses[id])id+="-"+newId().slice(0,4)}
-    S.ce=null;safe(()=>put("courses/"+id,c),c.name+" er gemt");
+    const was=S.ce.prov;S.ce=null;safe(()=>put("courses/"+id,{...c,note:""}),was?c.name+" er godkendt og klar til brug":c.name+" er gemt");
   }
   else if(a==="cehide"){const id=S.ce?.id;if(!id)return;S.ce=null;safe(()=>put("courses/"+id,{hidden:true},true),"Banen er fjernet fra menuerne. Gamle runder på banen er uændrede")}
   else if(a==="planopen"){S.planOpen=S.planOpen===el.dataset.id?null:el.dataset.id;render()}
