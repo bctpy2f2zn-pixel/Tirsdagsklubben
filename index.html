@@ -43,6 +43,7 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background
 .brand .flag::before{content:"";position:absolute;left:0;top:0;width:2px;height:22px;background:var(--board-ink)}
 .brand .flag::after{content:"";position:absolute;left:2px;top:1px;border-left:9px solid var(--flag);border-top:5px solid transparent;border-bottom:5px solid transparent}
 .brand .sub{margin-left:auto;font-size:12px;opacity:.8;text-align:right}
+nav.tabs[hidden]{display:none!important}
 nav.tabs{display:flex;gap:2px;overflow-x:auto;padding-bottom:0}
 nav.tabs a{flex:1 1 0;min-width:0;text-align:center;color:var(--board-ink);opacity:.7;text-decoration:none;font-family:var(--display);font-weight:600;font-size:clamp(13px,3.6vw,16px);letter-spacing:.03em;text-transform:uppercase;padding:8px 2px 10px;white-space:nowrap;border-bottom:3px solid transparent}
 nav.tabs a[aria-current="page"]{opacity:1;border-bottom-color:var(--flag)}
@@ -172,7 +173,7 @@ button.sm{min-height:32px;padding:4px 10px;font-size:13px}
 <div id="banner"></div>
 <main class="wrap" id="view"><div class="card empty"><p class="muted">Henter runder…</p></div></main>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 41</p>
+<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 42</p>
 
 <script>
 /* ---------- Konfiguration (let at justere) ---------- */
@@ -505,7 +506,26 @@ async function hashPw(pw,salt){
   return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("");
 }
 const logins=()=>D().logins||{};
-const needsAuth=()=>!S.demo&&!S.user;
+const needsAuth=()=>!S.demo&&!S.user&&!S.watch;
+// Se med (?se=1): gæster kan følge Live uden login. Data hentes fra live_snapshot() i databasen (kun runden, navne og baner).
+const WATCH=(()=>{try{return new URLSearchParams(location.search).has("se")}catch(e){return false}})();
+const watchUrl=()=>location.origin+location.pathname+"?se=1";
+async function watchPoll(){
+  try{const {data,error}=await SB.rpc("live_snapshot");if(error)throw error;
+    LIVE.rounds={};Object.entries(data.rounds||{}).forEach(([k,v])=>LIVE.rounds[k]={...v,id:k});
+    LIVE.entries=data.entries||{};LIVE.players={};Object.entries(data.players||{}).forEach(([k,v])=>LIVE.players[k]={...v,id:k});
+    LIVE.courses=data.courses||{};LIVE.config={trips:data.trips||{}};S.mode="live";S.stale=false;
+    const rid=Object.keys(LIVE.rounds)[0];if(rid)checkBirdies(rid);
+  }catch(e){S.stale=true}
+  render();
+}
+function smsHref(phone,text){const ios=/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);return "sms:"+String(phone||"").replace(/[^0-9+]/g,"")+(ios?"&":"?")+"body="+encodeURIComponent(text)}
+const shareText=()=>"Følg Tirsdagsklubben live her: "+watchUrl();
+function shareCard(){
+  if(S.demo||S.watch||!myId())return "";
+  return `<div class="card"><h3>Gæster kan følge med</h3><p class="small muted" style="margin:0 0 8px">Send linket til gæster. De kan se leaderboardet live uden at logge ind, men kan ikke ændre noget.</p>
+    <div class="row"><a class="btn sm" href="${esc(smsHref("",shareText()))}">📱 Send som SMS</a><button class="ghost sm" data-act="copywatch">Kopier link</button></div></div>`;
+}
 
 
 function vAuth(){
@@ -711,7 +731,7 @@ function vEvents(){
 
 /* ---------- Visninger ---------- */
 function render(){
-  let v=S.forceView||(location.hash||"#live").slice(1);if(v==="saeson")v="info";
+  let v=S.watch?"live":S.forceView||(location.hash||"#live").slice(1);if(v==="saeson")v="info";
   S.view=["live","indtast","tilmeld","info","spillere","runde"].includes(v)?v:"live";
   document.querySelectorAll("#tabs a").forEach(a=>a.setAttribute("aria-current",a.getAttribute("href")==="#"+S.view?"page":"false"));
   const r=currentRound();
@@ -724,9 +744,9 @@ function render(){
   const f={live:vLive,indtast:vEnter,tilmeld:vSignup,info:()=>vSeason()+guideCard(),spillere:vPlayers,runde:vRound}[S.view];
   const focus=document.activeElement?.id;
   if(!S.demo){const e=Object.entries(logins()).find(([,l])=>S.user&&l.uid===S.user.id);S.me=e?e[0]:null}
-  const gate=needsAuth(),claim=!gate&&!S.demo&&S.loginsLoaded&&!S.me;
-  $("#tabs").hidden=gate||claim;
-  $("#view").innerHTML=gate?vAuth():claim?vClaim():whoBar()+f();
+  const gate=needsAuth(),claim=!gate&&!S.demo&&!S.watch&&S.loginsLoaded&&!S.me;
+  $("#tabs").hidden=gate||claim||S.watch;
+  $("#view").innerHTML=gate?vAuth():claim?vClaim():S.watch?`<div class="whobar row small"><span>👀 Du ser med som gæst. Siden opdaterer af sig selv.</span></div>`+(Object.keys(LIVE.rounds).length?f():emptyCard("Ingen runde lige nu","Når Tirsdagsklubben spiller, kan du følge stillingen her.","")):whoBar()+f();
   if(focus&&document.getElementById(focus)&&document.getElementById(focus).tagName==="INPUT")document.getElementById(focus).focus();
 }
 function emptyCard(title,text,btns){return `<div class="card empty"><h2>${title}</h2><p class="muted">${text}</p><div class="row" style="justify-content:center">${btns||""}</div></div>`}
@@ -751,6 +771,7 @@ function scorecard(r,t){
 
 function vLive(){
   const r=currentRound();
+  if(!r&&S.watch) return emptyCard("Ingen runde lige nu","Når Tirsdagsklubben spiller, kan du følge stillingen her.","");
   if(!r) return emptyCard("Ingen runder endnu","Når en runde er startet under Runde, vises stillingen her og opdaterer sig selv, mens der tastes ude på banen.",`<a class="btn" href="#runde">Start en runde</a>${demoBtn()}`)+pushCard();
   if(S.boardRid!==r.id){S.boardRid=r.id;S.board=r.match||"stb"}
   const key={stb:["stb",-1],gross:["toPar",1],net:["netToPar",1]}[S.board];
@@ -774,7 +795,7 @@ function vLive(){
     <div class="row" style="margin-bottom:10px"><div><h2>${r.status==="live"?"Leaderboard":"Resultat"}</h2><div class="small muted">Dagens match: ${MATCH[r.match||"stb"]}${isFinale(r)?" · finale":""}${r.trip&&tripById(r.trip)?" · "+esc(tripById(r.trip).name):r.counts===false?" · tæller ikke i sæsonen":""}</div></div><span class="spacer"></span><div class="seg" role="group" aria-label="Spilleform">${seg}</div></div>
     <div class="tbl-wrap"><table class="lb"><colgroup><col style="width:44px"><col><col style="width:48px"><col style="width:64px"></colgroup><thead><tr><th>Pos</th><th>Spiller</th><th class="num">Hul</th><th class="num">${S.board==="stb"?"Point":"Score"}</th></tr></thead><tbody>${rows}</tbody></table></div>
     <p class="note">Tryk på en spiller for at se scorekortet. Huller med afvigelse tæller ikke med, før de er rettet. Lysere tal er kun tastet af én markør.</p>
-  </div>${birdieCard(r)}${pushCard()}`;
+  </div>${birdieCard(r)}${pushCard()}${shareCard()}`;
 }
 
 /* ---------- Push (birdie-beskeder når appen er lukket) ---------- */
@@ -1087,7 +1108,7 @@ function vPlayers(){
   ${(()=>{const gs=savedGuests();if(!gs.length&&!adm)return "";
     const gr=gs.map(g=>{const p=D().players[g.id];return `<tr><td>${adm?`<input id="name-${g.id}" data-pid="${g.id}" value="${esc(g.name)}" style="width:100%;min-width:120px" aria-label="Navn">${kindSel({...p,id:g.id})}`:`<strong>${esc(g.name)}</strong>`}</td>
       <td>${adm?`<input id="hi-${g.id}" inputmode="decimal" style="width:80px" value="${String(g.hi??"").replace(".",",")}" data-pid="${g.id}" aria-label="Handicap for ${esc(g.name)}">`:(g.hi!=null?String(g.hi).replace(".",","):'<span class="muted">–</span>')}</td>
-      <td class="r">${count(g.id)}</td></tr>`}).join("");
+      <td class="r">${count(g.id)}</td></tr>${adm?`<tr><td colspan="3" style="border-top:0;padding-top:0"><div class="row"><input id="ph-${g.id}" data-pid="${g.id}" type="tel" inputmode="tel" autocomplete="off" placeholder="Telefonnummer" value="${esc(p?.phone||"")}" style="width:150px" aria-label="Telefon for ${esc(g.name)}">${p?.phone?`<a class="btn sm" href="${esc(smsHref(p.phone,"Hej "+g.name.split(" ")[0]+". "+shareText()))}">📱 Send link</a>`:""}</div></td></tr>`:""}`}).join("");
     return `<div class="card"><h2>Gæster</h2><p class="muted small">Gæster bliver på listen, så de kan sættes på en runde igen. De tæller ikke i stillingen.${adm?" Bliver en gæst medlem af Tirsdagsklubben, så vælg Medlem under navnet.":""}</p>
     ${gs.length?`<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Navn</th><th>Handicap</th>${rh}</tr></thead><tbody>${gr}</tbody></table></div>`:`<p class="muted small">Ingen gæster endnu.</p>`}</div>`})()}
   ${me&&D().players[me]?`<div class="card"><h3>Mit teested</h3><p class="small muted" style="margin:0 0 8px">Bruges automatisk, når en runde startes. Du kan også skifte tee på selve dagen under Indtast.</p><div class="row">${myTeeCourses().map(cid=>{const c=course(cid),cur=D().players[me]?.tee?.[cid]||c.defaultTee;return `<label class="f">${esc(c.name)}<select id="pt-${cid}" data-c="${cid}">${Object.entries(c.tees||{}).map(([t,v])=>`<option value="${t}" ${t===cur?"selected":""}>${t} (CR ${String(v.cr).replace(".",",")} / slope ${v.slope})</option>`).join("")}</select></label>`}).join("")}</div></div>`:""}
@@ -1232,6 +1253,7 @@ document.addEventListener("click",ev=>{
   else if(a==="plandel"){const id=el.dataset.id;S.planOpen=null;savePeriods(periods().filter(p=>p.id!==id))}
   else if(a==="planadd"){const y=new Date().getFullYear()+1,id="p"+newId();S.planOpen=id;savePeriods(periods().concat([{id,name:"Ny sæson",start:y+"-04-01",end:y+"-06-30",finales:2}]))}
   else if(a==="ics"){downloadIcs(el.dataset.day)}
+  else if(a==="copywatch"){const u=watchUrl();(navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>toast("Linket er kopieret: "+u,"ok"),()=>toast("Linket er: "+u,"ok"))}
   else if(a==="calno"){S.calAsk=null;render()}
   else if(a==="sign"){const me=myId();if(!me)return;if(D().players[me]?.guest){toast("Gæster kan ikke selv tilmelde sig. Et medlem kan tilføje dig som gæst.","err");return}const k=el.dataset.day;safe(()=>put(`signups/${k}/entries/${me}`,{guest:false,at:Date.now()}).then(()=>{S.calAsk=calDone().includes(k)?null:k;render()}),"Du er tilmeldt")}
   else if(a==="unsign"){
@@ -1381,6 +1403,8 @@ document.addEventListener("change",ev=>{
   else if(el.id==="my-tee"){const r=currentRound(),me=myId();if(!r||!me)return;safe(()=>put("rounds/"+r.id,{tees:{...(r.tees||{}),[me]:el.value}},true),"Tee gemt for i dag")}
   else if((el.id||"").startsWith("pt-")){const me=myId(),cid=el.dataset.c;if(!me)return;safe(()=>put("players/"+me,{tee:{...(D().players[me]?.tee||{}),[cid]:el.value}},true),"Standard-tee gemt")}
   else if(el.id==="nr-counts"){S.draft.counts=el.checked}
+  else if((el.id||"").startsWith("ph-")){if(!isAdmin())return;const ph=el.value.trim();if(ph&&!/^[+0-9 ]{8,16}$/.test(ph)){toast("Telefonnummeret ser forkert ud, fx 20 12 34 56","err");return}
+    safe(()=>put("players/"+el.dataset.pid,{phone:ph},true),ph?"Telefonnummer gemt":"Telefonnummer fjernet")}
   else if((el.id||"").startsWith("kind-")){if(!isAdmin()){toast(ADMIN_ONLY);render();return}const pid=el.dataset.pid,g=el.value==="g";
     safe(()=>put("players/"+pid,{guest:g,active:!g},true),pname(pid)+(g?" er nu gæst":" er nu medlem"))}
   else if(el.id==="per-sel"){S.period=el.value;render()}
@@ -1442,6 +1466,7 @@ function makeDb(sb){
   const cfg=window.TK_CONFIG||{};
   if(!window.supabase||!cfg.url||!cfg.anonKey){S.mode="nodb";startDemo();return}
   SB=window.supabase.createClient(cfg.url,cfg.anonKey,{auth:{persistSession:true,autoRefreshToken:true}});
+  if(WATCH){S.watch=true;await watchPoll();setInterval(()=>{if(!document.hidden)watchPoll()},15000);document.addEventListener("visibilitychange",()=>{if(!document.hidden)watchPoll()});return}
   const db=makeDb(SB);
   const start=async()=>{
     if(S.db)return db.loadAll().catch(()=>{});
