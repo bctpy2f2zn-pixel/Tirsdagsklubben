@@ -165,14 +165,14 @@ button.sm{min-height:32px;padding:4px 10px;font-size:13px}
   <div class="wrap">
     <div class="brand"><img src="logo.png?v=4" alt="" width="34" height="34" style="display:block"><h1>Tirsdagsklubben</h1><div class="sub" id="sub"></div></div>
     <nav class="tabs" id="tabs">
-      <a href="#live">Live</a><a href="#indtast">Indtast</a><a href="#tilmeld">Tilmeld</a><a href="#saeson">Sæson</a><a href="#spillere">Spillere</a><a href="#runde">Runde</a>
+      <a href="#live">Live</a><a href="#indtast">Indtast</a><a href="#tilmeld">Tilmeld</a><a href="#spillere">Spillere</a><a href="#runde">Runde</a><a href="#info">Info</a>
     </nav>
   </div>
 </header>
 <div id="banner"></div>
 <main class="wrap" id="view"><div class="card empty"><p class="muted">Henter runder…</p></div></main>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 31</p>
+<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 32</p>
 
 <script>
 /* ---------- Konfiguration (let at justere) ---------- */
@@ -632,8 +632,8 @@ function vSignup(){
 
 /* ---------- Visninger ---------- */
 function render(){
-  const v=S.forceView||(location.hash||"#live").slice(1);
-  S.view=["live","indtast","tilmeld","saeson","spillere","runde"].includes(v)?v:"live";
+  let v=S.forceView||(location.hash||"#live").slice(1);if(v==="saeson")v="info";
+  S.view=["live","indtast","tilmeld","info","spillere","runde"].includes(v)?v:"live";
   document.querySelectorAll("#tabs a").forEach(a=>a.setAttribute("aria-current",a.getAttribute("href")==="#"+S.view?"page":"false"));
   const r=currentRound();
   $("#sub").innerHTML=r?`${r.status==="live"?'<span class="live-dot"></span>Live · ':""}${esc(course(r.course).name)}<br>${esc(fmtDate(r.id))}`:"";
@@ -642,7 +642,7 @@ function render(){
   else if(S.stale) b=`<div class="banner"><div class="wrap">Kan ikke hente de nyeste tal lige nu. Det du ser, kan være forældet.</div></div>`;
   $("#banner").innerHTML=b;
   if(S.mode==="loading"&&!S.demo) return;
-  const f={live:vLive,indtast:vEnter,tilmeld:vSignup,saeson:vSeason,spillere:vPlayers,runde:vRound}[S.view];
+  const f={live:vLive,indtast:vEnter,tilmeld:vSignup,info:()=>vSeason()+guideCard(),spillere:vPlayers,runde:vRound}[S.view];
   const focus=document.activeElement?.id;
   if(!S.demo){const e=Object.entries(logins()).find(([,l])=>S.user&&l.uid===S.user.id);S.me=e?e[0]:null}
   const gate=needsAuth(),claim=!gate&&!S.demo&&S.loginsLoaded&&!S.me;
@@ -829,6 +829,44 @@ function vSeason(){
     ${rows.length?`<div class="tbl-wrap"><table class="tbl season"><thead><tr><th>Nr.</th><th class="nm">Spiller</th><th class="r">Point</th><th class="r">Runder</th><th class="r">Sejre</th>${head}</tr></thead><tbody>${body}</tbody></table></div>`:`<p class="muted">Ingen afsluttede runder i denne sæson endnu.</p>`}
     <p class="note">${cfg.mode==="stb"?`Tallene er dagens stableford-point. De ${cfg.bestOf} bedste runder (markeret) lægges sammen.`:"Stort tal er point, lille tal er dagens stableford. Markerede felter tæller. Se pointmodellen nedenfor."} ${rounds.length} ${rounds.length===1?"tirsdag":"tirsdage"} spillet.</p>
   </div>`+(per.rules?"":cfgCard());
+}
+function guideCard(){
+  const sec=(t,items)=>`<h3 style="margin:16px 0 6px">${t}</h3><ul class="small" style="margin:0;padding-left:20px;line-height:1.55">${items.map(i=>`<li>${i}</li>`).join("")}</ul>`;
+  return `<div class="card"><h2>Sådan virker appen</h2>
+  ${sec("Log ind",[
+    "Første gang: tryk <strong>Første gang</strong>, skriv dit DGU-nummer og din fødselsdato som DDMMÅÅ, og vælg dit navn.",
+    "Bagefter logger du ind med DGU-nummer og adgangskode. Skift adgangskoden under <strong>Spillere</strong>.",
+    "Læg appen på hjemmeskærmen (iPhone: Del-knappen i Safari → Føj til hjemmeskærm). Så åbner den som en rigtig app.",
+    "Ny version: luk appen helt (stryg den væk) og åbn den igen. Versionsnummeret står nederst på siden."])}
+  ${sec("Tilmeld",[
+    "Du kan til- og afmelde dig de næste 3 tirsdage.",
+    "Fra søndag kl. 15 før tirsdagen kan du tilføje gæster, men kun så mange at holdet går op i hele 4-bolde.",
+    "Gæster spiller med, men tæller ikke i sæsonstillingen."])}
+  ${sec("Ude på banen: Indtast",[
+    "Ved første tee melder to i bolden sig som <strong>markører</strong> (\"Jeg er markør\"). Kun de to taster scorer, og de taster for hele bolden.",
+    "Vælg din tee for dagen samme sted.",
+    "Tast slag pr. hul. Tryk på tallet for at sætte par med det samme.",
+    "Taster de to markører forskelligt på et hul, bliver hullet rødt hos alle, og det tæller ikke, før det er rettet.",
+    "Efter hul 18 trykker begge markører <strong>Godkend scorekort</strong>. Det kan først lade sig gøre, når alle huller er ens hos dem begge."])}
+  ${sec("Live",[
+    "Leaderboardet opdaterer sig selv, mens der tastes. Skift mellem stableford, slag brutto og slag netto.",
+    "Tryk på en spiller for at se scorekortet. Lyse tal er indtil videre kun tastet af én markør.",
+    "\"Dagens birdies\" viser alle birdies og bedre i runden."])}
+  ${sec("Birdie-beskeder",[
+    "Når nogen laver birdie eller bedre, får de andre en besked som \"🐦 Kim har lavet birdie på hul 7\". Man får ikke besked om sin egen.",
+    "Har du appen åben, kommer beskeden som et gult banner øverst.",
+    "Vil du også have besked, når appen er lukket: åbn appen fra hjemmeskærmen, gå til <strong>Live</strong>, rul ned til \"Birdie-beskeder\" og tryk <strong>Slå birdie-beskeder til</strong> og så <strong>Tillad</strong>. Det skal gøres på hver telefon.",
+    "Kommer der ingen beskeder, så tjek at Tirsdag har lov til notifikationer under telefonens Indstillinger → Notifikationer."])}
+  ${sec("Sæson og point",[
+    "Info-siden øverst viser sæsonstillingen. Vælg en anden sæson i menuen.",
+    "Hver tirsdag gives point efter placeringen i stableford. Pointmodellen står ovenfor.",
+    "Hver sæson slutter med to finaler med dobbelt point."])}
+  ${sec("Spillere",[
+    "Du kan selv rette dit navn og dit handicap. Et nyt handicap bruges fra næste runde.",
+    "Du kan kun rette dine egne oplysninger og taste scorer for din egen bold. Alt andet klares af administratoren."])}
+  ${sec("Administrator",[
+    "Under <strong>Runde</strong> laver administratoren sæsonplan og bane pr. tirsdag, trykker <strong>Lav bolde</strong> (appen blander så folk spiller med flest forskellige) og starter og afslutter runden."])}
+  </div>`;
 }
 function vPlan(){
   const ps=periods(),opts=k=>Object.keys(COURSES_DEFAULT).map(c=>`<option value="${c}" ${c===k?"selected":""}>${esc(course(c).name)}</option>`).join("");
