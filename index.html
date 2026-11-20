@@ -173,7 +173,7 @@ button.sm{min-height:32px;padding:4px 10px;font-size:13px}
 <div id="banner"></div>
 <main class="wrap" id="view"><div class="card empty"><p class="muted">Henter runder…</p></div></main>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 42</p>
+<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 43</p>
 
 <script>
 /* ---------- Konfiguration (let at justere) ---------- */
@@ -593,7 +593,7 @@ const OPEN_TUESDAYS = 3;          // antal åbne tirsdage frem
 const GUEST_OPEN = {daysBefore:2, hour:15}; // gæster fra søndag kl. 15
 const APP_START="2027-01-01"; // appen bruges fra sæson 2027; 2026 er historik fra regnearkene
 // De næste tirsdage, der ligger i en sæson fra 2027 og frem.
-function openTuesdays(){const today=localIso(new Date());return periods().filter(p=>p.end>=APP_START).flatMap(tuesdaysIn).filter(d=>d>=today&&d>=APP_START).sort().slice(0,OPEN_TUESDAYS)}
+function openTuesdays(){const today=localIso(new Date());return [...new Set(periods().filter(p=>p.end>=APP_START).flatMap(tuesdaysIn))].filter(d=>d>=today&&d>=APP_START).sort().slice(0,OPEN_TUESDAYS)}
 function guestOpensAt(day){const d=new Date(day+"T00:00:00");d.setDate(d.getDate()-GUEST_OPEN.daysBefore);d.setHours(GUEST_OPEN.hour,0,0,0);return d}
 function signupInfo(day){
   const all=Object.values((D().signups||{})[day]||{}).sort((a,b)=>(a.at||0)-(b.at||0));
@@ -1248,10 +1248,11 @@ document.addEventListener("click",ev=>{
   else if(a==="plansave"){
     const id=el.dataset.id,name=$("#pn-"+id).value.trim(),start=$("#ps-"+id).value,end=$("#pe-"+id).value,finales=Math.max(0,parseInt($("#pf-"+id).value)||0);
     if(!name||!start||!end||end<start){toast("Udfyld navn, og sæt slut efter start");return}
+    const ov=periods().find(p=>p.id!==id&&p.start<=end&&p.end>=start);if(ov){toast(`Datoerne overlapper med ${ov.name}. To sæsoner kan ikke ligge oven i hinanden.`,"err");return}
     savePeriods(periods().map(p=>p.id===id?{...p,id,name,start,end,finales}:p));
   }
   else if(a==="plandel"){const id=el.dataset.id;S.planOpen=null;savePeriods(periods().filter(p=>p.id!==id))}
-  else if(a==="planadd"){const y=new Date().getFullYear()+1,id="p"+newId();S.planOpen=id;savePeriods(periods().concat([{id,name:"Ny sæson",start:y+"-04-01",end:y+"-06-30",finales:2}]))}
+  else if(a==="planadd"){const last=periods().map(p=>p.end).sort().pop()||localIso(new Date()),d=new Date(last+"T12:00:00");d.setDate(d.getDate()+1);const st=localIso(d);d.setMonth(d.getMonth()+3);const id="p"+newId();S.planOpen=id;savePeriods(periods().concat([{id,name:"Ny sæson",start:st,end:localIso(d),finales:2}]))}
   else if(a==="ics"){downloadIcs(el.dataset.day)}
   else if(a==="copywatch"){const u=watchUrl();(navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>toast("Linket er kopieret: "+u,"ok"),()=>toast("Linket er: "+u,"ok"))}
   else if(a==="calno"){S.calAsk=null;render()}
