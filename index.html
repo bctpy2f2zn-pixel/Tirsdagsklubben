@@ -171,7 +171,7 @@ button.sm{min-height:32px;padding:4px 10px;font-size:13px}
 <div id="banner"></div>
 <main class="wrap" id="view"><div class="card empty"><p class="muted">Henter runder…</p></div></main>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 27</p>
+<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 28</p>
 
 <script>
 /* ---------- Konfiguration (let at justere) ---------- */
@@ -254,6 +254,15 @@ function holeVals(r,pid){
     const same=vals.every(x=>x.v===vals[0].v);
     return same?{st:vals.length>1?"ok":"one",v:vals[0].v,vals}:{st:"conflict",vals};
   });
+}
+// Scorekortgodkendelse pr. bold: alle huller ens hos to tastere, og (mindst) to har trykket "Godkend".
+function flightStatus(r,fl){
+  const mates=(r.players||[]).filter(p=>r.flights?.[p]===fl);
+  const es=Object.values(D().entries[r.id]||{}).filter(e=>e.flight===fl);
+  const ready=mates.length>0&&mates.every(p=>holeVals(r,p).every(x=>x.st==="ok"));
+  const by=es.filter(e=>e.approved).map(e=>e.by);
+  const need=Math.min(2,mates.length);
+  return {mates,ready,by,need,approved:ready&&by.length>=need};
 }
 function calc(c,hi,hv){
   const ph=playingHcp(hi,c);
@@ -704,6 +713,11 @@ function vEnter(){
       <div class="row" style="margin-top:12px">${others.length?`<span class="chip">Makker-indtastning: ${others.map(o=>esc(pname(o.by))).join(", ")}</span>`:`<span class="chip">Ingen makker har tastet endnu</span>`}<span class="spacer"></span>
       ${h<17?`<button class="primary" data-act="hole" data-h="${h+2}">Næste hul</button>`:`<a class="btn primary" href="#live" style="background:var(--board);color:var(--board-ink)">Se leaderboard</a>`}</div>
     </div>
+    ${(()=>{const st=flightStatus(r,fl),mineOk=!!mine.approved;
+      const who=st.by.length?`Godkendt af ${st.by.map(b=>esc(pname(b))).join(" og ")}.`:"Ingen har godkendt endnu.";
+      return `<div class="card ${st.approved?"":""}"><h3>Scorekort for bold ${fl}</h3>
+      <p class="small muted" style="margin:0 0 10px">${st.approved?`<strong style="color:var(--ok,#1f7a4d)">✓ Scorekortet er godkendt.</strong> `:st.ready?"Alle huller er ens hos jer begge. ":"Godkend kan først bruges, når I begge har tastet alle 18 huller, og der ikke er afvigelser. "}${who} Ændrer nogen en score bagefter, skal der godkendes igen.</p>
+      ${mineOk?`<span class="chip">Du har godkendt</span>`:`<button class="primary" data-act="approve" ${st.ready?"":"disabled"}>Godkend scorekort</button>`}</div>`})()}
     <div class="card"><label class="f">Din tee i dag<select id="my-tee">${Object.entries(c.tees||{}).map(([t,v])=>`<option value="${t}" ${t===teeOf(r,me)?"selected":""}>${t} (CR ${String(v.cr).replace(".",",")} / slope ${v.slope})</option>`).join("")}</select></label>${picker}<p class="note">Bold ${fl} · ${esc(c.name)}. Du kan kun taste for din egen bold. Tryk på tallet for at sætte par.</p></div>`;
 }
 
@@ -809,12 +823,14 @@ function vRound(){
   const delUi=x=>!adm||x.imported?"":S.confirmDel===x.id?`<div class="row" style="margin-top:10px"><span class="small"><strong style="color:var(--warn)">Slet runden ${esc(fmtDate(x.id))} med alle scorer?</strong> Det kan ikke fortrydes.</span><span class="spacer"></span><button data-act="nodel">Fortryd</button><button class="danger" data-act="delround" data-rid="${x.id}">Ja, slet</button></div>`:`<div class="row" style="margin-top:10px"><span class="spacer"></span><button class="ghost sm" data-act="askdel" data-rid="${x.id}">Slet runde</button></div>`;
   if(live){
     const nf=Math.max(...Object.values(r.flights||{1:1}));
-    const fl=Array.from({length:nf},(_,i)=>i+1).map(n=>`<div class="flight"><h3>Bold ${n}</h3>${(r.players||[]).filter(p=>r.flights[p]===n).map(p=>`<div class="row" style="justify-content:space-between;margin:4px 0"><span>${esc(pname(p))}</span>${adm?`<select id="fl-${p}" data-act="moveflight" data-pid="${p}" aria-label="Flyt ${esc(pname(p))} til bold">${Array.from({length:nf+1},(_,i)=>`<option value="${i+1}" ${i+1===n?"selected":""}>Bold ${i+1}</option>`).join("")}</select>`:""}</div>`).join("")}</div>`).join("");
+    const fst=n=>{const st=flightStatus(r,n);return st.approved?` <span class="chip" style="font-size:12px">✓ Godkendt</span>`:` <span class="chip" style="font-size:12px;opacity:.75">Ikke godkendt</span>`};
+    const fl=Array.from({length:nf},(_,i)=>i+1).map(n=>`<div class="flight"><h3>Bold ${n}${fst(n)}</h3>${(r.players||[]).filter(p=>r.flights[p]===n).map(p=>`<div class="row" style="justify-content:space-between;margin:4px 0"><span>${esc(pname(p))}</span>${adm?`<select id="fl-${p}" data-act="moveflight" data-pid="${p}" aria-label="Flyt ${esc(pname(p))} til bold">${Array.from({length:nf+1},(_,i)=>`<option value="${i+1}" ${i+1===n?"selected":""}>Bold ${i+1}</option>`).join("")}</select>`:""}</div>`).join("")}</div>`).join("");
     const cf=conflictList(r).length;
+    const nap=[...new Set(Object.values(r.flights||{}))].filter(n=>!flightStatus(r,n).approved).length;
     html+=`<div class="card"><div class="row"><h2>Aktiv runde</h2><span class="chip"><span class="live-dot"></span>Live</span></div>
       <p class="muted">${esc(fmtDate(r.id))} · ${esc(course(r.course).name)} · tee ${esc(r.tee||course(r.course).defaultTee)} · ${MATCH[r.match||"stb"]} · ${(r.players||[]).length} spillere</p>
       <div class="flights">${fl}</div>${S.confirmEnd?"":delUi(r)}
-      ${!adm?"":`<div class="row" style="margin-top:14px">${S.confirmEnd?`<span class="small">${cf?`<strong style="color:var(--warn)">${cf} afvigelser er ikke rettet.</strong> `:""}Afslut runden og giv sæsonpoint?</span><span class="spacer"></span><button data-act="noend">Fortryd</button><button class="danger" data-act="end">Ja, afslut</button>`:`<span class="spacer"></span><button class="primary" data-act="askend">Afslut runde</button>`}</div>`}</div>`;
+      ${!adm?"":`<div class="row" style="margin-top:14px">${S.confirmEnd?`<span class="small">${cf?`<strong style="color:var(--warn)">${cf} afvigelser er ikke rettet.</strong> `:""}${nap?`<strong style="color:var(--warn)">${nap} ${nap===1?"bold har":"bolde har"} ikke godkendt scorekortet.</strong> `:""}${cf||nap?"Afslut alligevel":"Afslut runden og giv sæsonpoint"}?</span><span class="spacer"></span><button data-act="noend">Fortryd</button><button class="danger" data-act="end">Ja, afslut</button>`:`<span class="spacer"></span><button class="primary" data-act="askend">Afslut runde</button>`}</div>`}</div>`;
   }else if(r&&r.status==="done"){
     html+=`<div class="card"><div class="row"><span>Seneste runde: ${esc(fmtDate(r.id))} er afsluttet.</span><span class="spacer"></span>${adm&&!r.imported?`<button data-act="reopen">Genåbn</button>`:""}</div>${delUi(r)}</div>`;
   }
@@ -852,7 +868,7 @@ function setScore(pid,v){
   const e=clone(all[me])||{by:me,flight:fl,scores:{}};
   e.flight=fl;
   e.scores[pid]=e.scores[pid]||Array(18).fill(null);
-  e.scores[pid][S.hole-1]=v;
+  e.scores[pid][S.hole-1]=v;e.approved=false;
   all[me]=e;render();
   if(!S.demo) queueSave(r.id,me,e);
 }
@@ -958,6 +974,13 @@ document.addEventListener("click",ev=>{
     safe(async()=>{for(const p of pids) await del(`rounds/${rid}/entries/${p}`);
       for(const p of (x.players||[])) if(p.startsWith("g-")&&D().players[p]?.guest) await del("players/"+p);
       await del("rounds/"+rid);delete LIVE.rounds[rid];delete LIVE.entries[rid]},"Runden er slettet");
+  }
+  else if(a==="approve"){
+    const r=currentRound(),me=myId();if(!r||!me||!r.flights?.[me])return;
+    const st=flightStatus(r,r.flights[me]);if(!st.ready){toast("Scorekortet kan først godkendes, når alle huller er ens.","err");return}
+    const all=D().entries[r.id]||(D().entries[r.id]={});
+    const e={...clone(all[me]||{by:me,flight:r.flights[me],scores:{}}),approved:true,approvedAt:Date.now()};
+    all[me]=e;render();if(!S.demo)queueSave(r.id,me,e);toast("Du har godkendt scorekortet","ok");
   }
   else if(a==="reopen"){safe(()=>put("rounds/"+r.id,{status:"live"},true),"Runden er genåbnet")}
 });
