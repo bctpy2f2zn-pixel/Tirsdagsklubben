@@ -172,7 +172,7 @@ button.sm{min-height:32px;padding:4px 10px;font-size:13px}
 <div id="banner"></div>
 <main class="wrap" id="view"><div class="card empty"><p class="muted">Henter runder…</p></div></main>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 38</p>
+<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 39</p>
 
 <script>
 /* ---------- Konfiguration (let at justere) ---------- */
@@ -426,7 +426,7 @@ let unsubEntries=null,entriesRid=null,loadTimer=null;
 const signupSubs={};
 function ensureSignupSubs(){
   if(!S.db||!S.periodsLoaded)return;
-  openTuesdays().forEach(day=>{if(signupSubs[day])return;signupSubs[day]=S.db.collection(`signups/${day}/entries`).onSnapshot(snap=>{
+  openTuesdays().concat(upcomingTrips().map(t=>t.id)).forEach(day=>{if(signupSubs[day])return;signupSubs[day]=S.db.collection(`signups/${day}/entries`).onSnapshot(snap=>{
     const m={};snap.docs.forEach(d=>m[d.id]={...d.data(),id:d.id});LIVE.signups[day]=m;render();
   },()=>{})});
 }
@@ -618,6 +618,7 @@ function draftSel(day){
   const t=tripOf(day),prev=t&&Object.values(D().rounds).filter(r=>r.trip===t.id&&r.id.slice(0,10)<=day).sort((a,b)=>b.id.localeCompare(a.id))[0];
   if(info.members.length){info.members.forEach(e=>sel[e.id]=true);info.guests.forEach(e=>sel[e.id]=true)}
   else if(prev)(prev.players||[]).forEach(p=>sel[p]=true);
+  else if(t&&Object.keys((D().signups||{})[t.id]||{}).length)Object.values(D().signups[t.id]).forEach(e=>sel[e.id]=true);
   else Object.values(D().players).filter(p=>!p.guest).forEach(p=>sel[p.id]=true);
   return sel;
 }
@@ -637,14 +638,56 @@ function vSignup(){
     else gst=`<div class="row" style="margin-top:8px"><label class="f" style="flex:1 1 140px">Gæstens navn<input id="gn-${day}" autocomplete="off" list="gl-${day}" placeholder="Skriv eller vælg"></label><datalist id="gl-${day}">${savedGuests().map(g=>`<option value="${esc(g.name)}">`).join("")}</datalist><label class="f">Handicap<input id="gh-${day}" inputmode="decimal" style="width:80px"></label><button data-act="addguest" data-day="${day}" style="align-self:end">Tilføj gæst</button></div><p class="note">${free} ${free===1?"ledig gæsteplads":"ledige gæstepladser"}.</p>`;
     return `<div class="card">
       <div class="row"><div><h2>${esc(fmtDate(day))}</h2><div class="small muted">${courseFor(day)?esc(course(courseFor(day)).name)+" · ":""}${isFinale({id:day})?"Finale · ":""}${ms.length} tilmeldt${guests.length?` · ${guests.length} ${guests.length===1?"gæst":"gæster"}`:""} · ${Math.ceil(n/4)||0} ${Math.ceil(n/4)===1?"bold":"bolde"}</div></div><span class="spacer"></span>
-      ${me?(isIn?`<button data-act="unsign" data-day="${day}" data-id="${me}">Afmeld mig</button>`:`<button class="primary" data-act="sign" data-day="${day}">Tilmeld mig</button>`):""}</div>
+      ${me?(isIn?`<button class="sm" data-act="ics" data-day="${day}">📅 Læg i kalender</button><button data-act="unsign" data-day="${day}" data-id="${me}">Afmeld mig</button>`:`<button class="primary" data-act="sign" data-day="${day}">Tilmeld mig</button>`):""}</div>
       ${n?`<ol class="signlist">${list}</ol>`:`<p class="muted">Ingen tilmeldte endnu.</p>`}
       ${adm&&n>=2?`<div class="row" style="margin-bottom:8px"><button class="primary" data-act="gobolde" data-day="${day}">Lav bolde for denne dag</button></div>`:""}
       ${adm?`<div class="row"><select id="as-${day}" aria-label="Tilmeld medlem"><option value="">Tilmeld et medlem…</option>${members.filter(p=>!ms.some(e=>e.id===p.id)).map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join("")}</select></div>`:""}
       ${gst}
     </div>`;
   }).join("");
-  return (!me&&!adm?whoCard("Vælg dit navn for at tilmelde eller afmelde dig."):"")+cards;
+  return (!me&&!adm?whoCard("Vælg dit navn for at tilmelde eller afmelde dig."):"")+cards+vEvents();
+}
+/* Ture og events på Tilmeld: et event er en tur på én dag. Tilmelding gemmes i signups/<tur-id>/entries. */
+// Kalender: hent en .ics-fil (heldagsbegivenhed), som telefonen tilbyder at lægge i kalenderen
+function icsFor(key){
+  const t=tripById(key),start=t?t.start:key,end=t?t.end:key;
+  const cs=t?[...new Set(Object.values(t.days||{}).filter(Boolean))].map(c=>course(c).name).join(", "):(courseFor(key)?course(courseFor(key)).name:"");
+  const title=t?"Tirsdagsklubben: "+t.name:"Tirsdagsklubben"+(cs?" · "+cs:"");
+  const loc=t?cs:"The Scandinavian"+(cs?", "+cs:"");
+  const d=x=>x.replace(/-/g,""),next=x=>{const z=new Date(x+"T12:00:00");z.setDate(z.getDate()+1);return localIso(z)};
+  const e=x=>String(x).replace(/[\\,;]/g,m=>"\\"+m);
+  return ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Tirsdagsklubben//DA","CALSCALE:GREGORIAN","BEGIN:VEVENT",
+    "UID:tk-"+key+"-"+(myId()||"x")+"@tirsdagsklubben","DTSTAMP:"+new Date().toISOString().replace(/[-:]/g,"").slice(0,15)+"Z",
+    "DTSTART;VALUE=DATE:"+d(start),"DTEND;VALUE=DATE:"+d(next(end)),"SUMMARY:"+e(title),loc?"LOCATION:"+e(loc):"",
+    "DESCRIPTION:"+e("Du er tilmeldt i Tirsdagsklubben-appen."),"END:VEVENT","END:VCALENDAR"].filter(Boolean).join("\r\n");
+}
+function downloadIcs(key){
+  const txt=icsFor(key),name="tirsdagsklubben-"+key+".ics";
+  // iPhone: Safari viser selv "Føj til kalender", når den åbner en kalenderfil
+  if(/iPhone|iPad|iPod/.test(navigator.userAgent)){location.href="data:text/calendar;charset=utf-8,"+encodeURIComponent(txt);return}
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([txt],{type:"text/calendar"}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);
+}
+function upcomingTrips(){const today=localIso(new Date());return trips().filter(t=>t.end>=today)}
+function vEvents(){
+  const me=myId(),adm=isAdmin(),ts=upcomingTrips();
+  const members=Object.values(D().players).filter(p=>!p.guest).sort((a,b)=>a.name.localeCompare(b.name,"da"));
+  const fmtS=d=>new Date(d+"T12:00:00").toLocaleDateString("da-DK",{weekday:"short",day:"numeric",month:"long"});
+  const cards=ts.map(t=>{
+    const id=t.id,all=Object.values((D().signups||{})[id]||{}).sort((a,b)=>(a.at||0)-(b.at||0));
+    const ms=all.filter(e=>!e.guest),gs=all.filter(e=>e.guest),isIn=me&&ms.some(e=>e.id===me);
+    const cs=[...new Set(Object.values(t.days||{}).filter(Boolean))].map(c=>esc(course(c).name)).join(", ");
+    const rm=e=>(adm||(!e.guest&&e.id===me)||(e.guest&&e.by===me))?` <button class="ghost sm" data-act="unsign" data-day="${id}" data-id="${e.id}" aria-label="Fjern">Fjern</button>`:"";
+    const list=ms.map(e=>`<li><span>${esc(pname(e.id))}${e.id===me?" (dig)":""}</span>${rm(e)}</li>`).join("")+gs.map(e=>`<li><span>${esc(e.name)} <span class="muted small">gæst af ${esc(pname(e.by))}${e.hi!=null?", hcp "+String(e.hi).replace(".",","):""}</span></span>${rm(e)}</li>`).join("");
+    return `<div class="card">
+      <div class="row"><div><h2>${esc(t.name)}</h2><div class="small muted">${esc(fmtS(t.start))}${t.end!==t.start?" til "+esc(fmtS(t.end)):""}${cs?" · "+cs:""} · ${ms.length} tilmeldt${gs.length?` · ${gs.length} ${gs.length===1?"gæst":"gæster"}`:""}</div></div><span class="spacer"></span>
+      ${me&&!D().players[me]?.guest?(isIn?`<button class="sm" data-act="ics" data-day="${id}">📅 Læg i kalender</button><button data-act="unsign" data-day="${id}" data-id="${me}">Afmeld mig</button>`:`<button class="primary" data-act="sign" data-day="${id}">Tilmeld mig</button>`):""}</div>
+      ${all.length?`<ol class="signlist">${list}</ol>`:`<p class="muted">Ingen tilmeldte endnu.</p>`}
+      ${adm?`<div class="row"><select id="as-${id}" aria-label="Tilmeld medlem"><option value="">Tilmeld et medlem…</option>${members.filter(p=>!ms.some(e=>e.id===p.id)).map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join("")}</select></div>`:""}
+      ${me||adm?`<div class="row" style="margin-top:8px"><label class="f" style="flex:1 1 140px">Gæstens navn<input id="gn-${id}" autocomplete="off" list="gl-${id}" placeholder="Skriv eller vælg"></label><datalist id="gl-${id}">${savedGuests().map(g=>`<option value="${esc(g.name)}">`).join("")}</datalist><label class="f">Handicap<input id="gh-${id}" inputmode="decimal" style="width:80px"></label><button data-act="addguest" data-day="${id}" style="align-self:end">Tilføj gæst</button></div>`:""}
+    </div>`}).join("");
+  if(!cards&&!adm)return "";
+  return `<h2 style="margin:22px 4px 8px">Ture og events</h2>${cards||`<div class="card"><p class="muted" style="margin:0">Ingen kommende ture eller events.</p></div>`}
+    ${adm?`<div class="row" style="margin:0 4px 16px"><button data-act="tripadd" data-go="runde">Nyt event eller tur</button></div>`:""}`;
 }
 
 /* ---------- Visninger ---------- */
@@ -927,9 +970,9 @@ function vTrips(){
         <p class="note">Mangler banen? Opret den under "Andre baner" herunder først. Ret datoerne og tryk Gem, så kommer de nye dage med.</p>
         <div class="row" style="margin-top:8px"><button class="primary sm" data-act="tripsave" data-id="${t.id}">Gem tur</button>${S.confirmTripDel===t.id?`<span class="small">Slet turen? Runder der er spillet, bliver liggende.</span><button class="sm" data-act="tripnodel">Fortryd</button><button class="sm danger" data-act="tripdel" data-id="${t.id}">Ja, slet</button>`:`<button class="sm ghost" data-act="tripaskdel" data-id="${t.id}">Slet tur</button>`}</div>`:""}
     </div>`;}).join("");
-  return `<div class="card"><h2>Ture</h2><p class="small muted">En tur er fx et par dage på Fyn. Vælg banen for hver dag. Når du starter en runde på en af turens dage, vælges banen automatisk, og runden tæller i turens egen stilling (samlet stableford) under Info. Den tæller ikke i sæsonstillingen.</p>
+  return `<div class="card"><h2>Ture og events</h2><p class="small muted">En tur er fx et par dage på Fyn. Et event er en tur på én dag (sæt første og sidste dag ens). Medlemmerne tilmelder sig under Tilmeld. Vælg banen for hver dag. Når du starter en runde på en af turens dage, vælges banen automatisk, og runden tæller i turens egen stilling (samlet stableford) under Info. Den tæller ikke i sæsonstillingen.</p>
     ${items?`<div style="display:grid;gap:10px">${items}</div>`:""}
-    <div class="row" style="margin-top:12px"><button data-act="tripadd">Ny tur</button></div></div>`;
+    <div class="row" style="margin-top:12px"><button data-act="tripadd">Nyt event eller tur</button></div></div>`;
 }
 function saveTrips(list,msg){return safe(()=>put("config/trips",{list}),msg||"Turen er gemt")}
 function blankCourse(){return {id:null,name:"",par:Array(18).fill(""),si:Array(18).fill(""),tees:[{n:"",cr:"",slope:""},{n:"",cr:"",slope:""},{n:"",cr:"",slope:""}],def:"",note:""}}
@@ -1127,7 +1170,7 @@ document.addEventListener("click",ev=>{
   }
   else if(["tripadd","tripsave","tripdel","ceopen","cesave","cehide"].includes(a)&&!isAdmin()){toast(ADMIN_ONLY)}
   else if(a==="tripopen"){S.tripOpen=S.tripOpen===el.dataset.id?null:el.dataset.id;S.confirmTripDel=null;render()}
-  else if(a==="tripadd"){const id="t"+newId(),day=localIso(new Date());S.tripOpen=id;saveTrips(trips().concat([{id,name:"Ny tur",start:day,end:day,days:{}}]),"Turen er oprettet. Ret navn, datoer og baner")}
+  else if(a==="tripadd"){const id="t"+newId(),day=localIso(new Date());S.tripOpen=id;if(el.dataset.go){S.forceView=el.dataset.go;try{history.replaceState(null,"","#"+el.dataset.go)}catch(e){}window.scrollTo(0,document.body.scrollHeight)}saveTrips(trips().concat([{id,name:"Ny tur",start:day,end:day,days:{}}]),"Turen er oprettet. Ret navn, datoer og baner")}
   else if(a==="tripsave"){
     const id=el.dataset.id,t=tripById(id),name=$("#tn-"+id).value.trim(),start=$("#ts-"+id).value,end=$("#te-"+id).value;
     if(!name||!start||!end||end<start){toast("Udfyld navn, og sæt sidste dag efter første dag");return}
@@ -1167,6 +1210,7 @@ document.addEventListener("click",ev=>{
   }
   else if(a==="plandel"){const id=el.dataset.id;S.planOpen=null;savePeriods(periods().filter(p=>p.id!==id))}
   else if(a==="planadd"){const y=new Date().getFullYear()+1,id="p"+newId();S.planOpen=id;savePeriods(periods().concat([{id,name:"Ny sæson",start:y+"-04-01",end:y+"-06-30",finales:2}]))}
+  else if(a==="ics"){downloadIcs(el.dataset.day)}
   else if(a==="sign"){const me=myId();if(!me)return;if(D().players[me]?.guest){toast("Gæster kan ikke selv tilmelde sig. Et medlem kan tilføje dig som gæst.","err");return}safe(()=>put(`signups/${el.dataset.day}/entries/${me}`,{guest:false,at:Date.now()}),"Du er tilmeldt")}
   else if(a==="unsign"){
     const day=el.dataset.day,id=el.dataset.id,e=(D().signups?.[day]||{})[id];
@@ -1175,8 +1219,9 @@ document.addEventListener("click",ev=>{
   }
   else if(a==="addguest"){
     const day=el.dataset.day,me=myId(),info=signupInfo(day);
-    if(!info.open&&!isAdmin()){toast("Gæster kan først tilføjes fra søndag kl. 15.");return}
-    if(!info.free){toast("Der er ingen ledige gæstepladser.");return}
+    const isTrip=!!tripById(day);
+    if(!isTrip&&!info.open&&!isAdmin()){toast("Gæster kan først tilføjes fra søndag kl. 15.");return}
+    if(!isTrip&&!info.free){toast("Der er ingen ledige gæstepladser.");return}
     if(!me&&!isAdmin()){toast("Vælg dit navn først.");return}
     const name=$("#gn-"+day).value.trim(),hi=parseFloat(($("#gh-"+day).value||"").replace(",","."));
     if(!name){toast("Skriv gæstens navn");return}
