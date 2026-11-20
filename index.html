@@ -179,7 +179,7 @@ button.sm{min-height:32px;padding:4px 10px;font-size:13px}
 <div id="banner"></div>
 <main class="wrap" id="view"><div class="card empty"><p class="muted">Henter runder…</p></div></main>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 56</p>
+<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 57</p>
 
 <script>
 /* ---------- Konfiguration (let at justere) ---------- */
@@ -485,9 +485,15 @@ function stopDemo(){S.demo=false;S.open=null;S.draft=null;render()}
 const myId=()=>{const m=S.demo?S.meDemo:S.me;return m&&D().players[m]?m:null};
 // Administrator: artefaktens ejer, eller en spiller markeret admin:true (fx Kim Holtum)
 // UI-lås; databasen tjekker selv (tabellen admins), så ingen kan snyde sig til at være administrator.
-const canAdmin=()=>!!D().players[S.demo?S.meDemo:S.me]?.admin;
+// Administrator (Kim, admin:true) og turneringsledere (coadmin:true). Kun administratoren må ændre sæsonplan, pointmodel og roller.
+const canAdmin=()=>{const p=D().players[S.demo?S.meDemo:S.me];return !!(p?.admin||p?.coadmin)};
+const canOwner=()=>!!D().players[S.demo?S.meDemo:S.me]?.admin;
+const isOwner=()=>canOwner()&&!S.asPlayer;
 const isAdmin=()=>canAdmin()&&!S.asPlayer;
 const ADMIN_ONLY="Det kan kun administratoren.";
+const OWNER_ONLY="Det kan kun administratoren (ikke turneringsledere).";
+// Tee for dagen: spillere og markører gemmer via databasefunktionen set_round_tee, som tjekker at man er markør i bolden
+function setTee(r,pid,tee,msg){return safe(()=>isAdmin()||S.demo?put("rounds/"+r.id,{tees:{...(r.tees||{}),[pid]:tee}},true):S.db.rpcDoc("set_round_tee",{p_rid:r.id,p_pid:pid,p_tee:tee},"rounds/"+r.id),msg)}
 function whoCard(text){
   const ps=Object.values(D().players).filter(p=>!p.guest).sort((a,b)=>a.name.localeCompare(b.name,"da"));
   return `<div class="card"><h2>Hvem er du?</h2><p class="muted">${text||"Vælg dit navn. Så kan du rette dit eget handicap og taste scorer for din bold."}</p>
@@ -497,7 +503,7 @@ function whoCard(text){
 function whoBar(){
   const me=myId();
   return `<div class="whobar row small">${me?`<span>Du er <strong>${esc(pname(me))}</strong></span>`:`<span class="muted">Du har ikke valgt dit navn</span>`}
-    <span class="chip">${isAdmin()?"Administrator":"Spiller"}</span><span class="spacer"></span>
+    <span class="chip">${isOwner()?"Administrator":isAdmin()?"Turneringsleder":"Spiller"}</span><span class="spacer"></span>
     ${me?`<button class="ghost sm" data-act="logout">Log ud</button>`:""}
     ${canAdmin()?`<button class="ghost sm" data-act="role">${S.asPlayer?"Tilbage til administrator":"Se som spiller"}</button>`:""}</div>`;
 }
@@ -1015,7 +1021,11 @@ function vPlan(){
     <div style="display:grid;gap:10px">${items}</div>
     <div class="row" style="margin-top:12px"><button data-act="planadd">Ny sæson</button></div></div>`;
 }
-function kindSel(p){return `<select id="kind-${p.id}" data-pid="${p.id}" aria-label="Medlem eller gæst" style="margin-top:4px;width:100%"><option value="m" ${p.guest?"":"selected"}>Medlem</option><option value="g" ${p.guest?"selected":""}>Gæst</option></select>`}
+function kindSel(p){
+  if(p.admin)return `<div class="small muted" style="margin-top:4px">Administrator</div>`;
+  const k=p.guest?"g":p.coadmin?"c":"m";
+  if(!isOwner())return `<div class="small muted" style="margin-top:4px">${k==="g"?"Gæst":k==="c"?"Turneringsleder":"Medlem"}</div>`;
+  return `<select id="kind-${p.id}" data-pid="${p.id}" aria-label="Rolle" style="margin-top:4px;width:100%"><option value="m" ${k==="m"?"selected":""}>Medlem</option><option value="c" ${k==="c"?"selected":""}>Turneringsleder</option><option value="g" ${k==="g"?"selected":""}>Gæst</option></select>`}
 // Gæster der er gemt (har spillet før eller er tilføjet af administratoren), nyeste først
 function savedGuests(){return Object.entries(D().players).filter(([id,p])=>p.guest&&!p.hidden&&p.name).map(([id,p])=>({id,name:p.name,hi:p.hi??null,guest:true,at:p.at||0})).sort((a,b)=>a.name.localeCompare(b.name,"da"))}
 /* Ture og andre baner (kun administrator) */
@@ -1266,7 +1276,7 @@ function vRound(){
     ${tripOf(d.date)?`<p class="chip" style="margin:0 0 10px">${esc(tripOf(d.date).name)}: runden tæller i turens stilling</p>`:""}
     ${course(d.course).provisional?`<p class="note">${course(d.course).note?esc(course(d.course).note):`Par og index pr. hul for ${esc(course(d.course).name)} er foreløbige, indtil vi har scorekortet. CR og slope er de rigtige.`}</p>`:""}
   </div>`;
-  return html+vPlan()+vTrips()+vCourses();
+  return html+(isOwner()?vPlan():"")+vTrips()+vCourses();
 }
 
 /* ---------- Handlinger ---------- */
@@ -1332,7 +1342,7 @@ document.addEventListener("click",ev=>{
   }
   else if(a==="cehide"){const id=S.ce?.id;if(!id)return;S.ce=null;safe(()=>put("courses/"+id,{hidden:true},true),"Banen er fjernet fra menuerne. Gamle runder på banen er uændrede")}
   else if(a==="planopen"){S.planOpen=S.planOpen===el.dataset.id?null:el.dataset.id;render()}
-  else if(["plansave","plandel","planadd"].includes(a)&&!isAdmin()){toast(ADMIN_ONLY)}
+  else if(["plansave","plandel","planadd","savecfg"].includes(a)&&!isOwner()){toast(OWNER_ONLY)}
   else if(a==="plansave"){
     const id=el.dataset.id,name=$("#pn-"+id).value.trim(),start=$("#ps-"+id).value,end=$("#pe-"+id).value,finales=Math.max(0,parseInt($("#pf-"+id).value)||0);
     if(!name||!start||!end||end<start){toast("Udfyld navn, og sæt slut efter start");return}
@@ -1494,14 +1504,14 @@ document.addEventListener("change",ev=>{
   else if(el.id==="nr-tee"){S.draft.tee=el.value}
   else if(el.classList?.contains("mate-tee")){const r=currentRound(),me=myId(),pid=el.dataset.pid;if(!r||!me)return;
     if(!isAdmin()&&!(markersOf(r,r.flights?.[me]).includes(me)&&r.flights?.[pid]===r.flights?.[me])){toast("Kun markørerne i bolden kan rette tee for andre.","err");render();return}
-    safe(()=>put("rounds/"+r.id,{tees:{...(r.tees||{}),[pid]:el.value}},true),"Tee gemt for "+pname(pid))}
-  else if(el.id==="my-tee"){const r=currentRound(),me=myId();if(!r||!me)return;safe(()=>put("rounds/"+r.id,{tees:{...(r.tees||{}),[me]:el.value}},true),"Tee gemt for i dag")}
+    setTee(r,pid,el.value,"Tee gemt for "+pname(pid))}
+  else if(el.id==="my-tee"){const r=currentRound(),me=myId();if(!r||!me)return;setTee(r,me,el.value,"Tee gemt for i dag")}
   else if((el.id||"").startsWith("pt-")){const me=myId(),cid=el.dataset.c;if(!me)return;safe(()=>put("players/"+me,{tee:{...(D().players[me]?.tee||{}),[cid]:el.value}},true),"Standard-tee gemt")}
   else if(el.id==="nr-counts"){S.draft.counts=el.checked}
   else if((el.id||"").startsWith("ph-")){if(!isAdmin())return;const ph=el.value.trim();if(ph&&!/^[+0-9 ]{8,16}$/.test(ph)){toast("Telefonnummeret ser forkert ud, fx 20 12 34 56","err");return}
     safe(()=>put("players/"+el.dataset.pid,{phone:ph},true),ph?"Telefonnummer gemt":"Telefonnummer fjernet")}
-  else if((el.id||"").startsWith("kind-")){if(!isAdmin()){toast(ADMIN_ONLY);render();return}const pid=el.dataset.pid,g=el.value==="g";
-    safe(()=>put("players/"+pid,{guest:g,active:!g},true),pname(pid)+(g?" er nu gæst":" er nu medlem"))}
+  else if((el.id||"").startsWith("kind-")){if(!isOwner()){toast(OWNER_ONLY);render();return}const pid=el.dataset.pid,v=el.value,g=v==="g";
+    safe(()=>put("players/"+pid,{guest:g,active:!g,coadmin:v==="c"},true),pname(pid)+(g?" er nu gæst":v==="c"?" er nu turneringsleder":" er nu medlem"))}
   else if(el.id==="per-sel"){S.period=el.value;render()}
   else if(el.id==="nr-start"){if(!isAdmin())return;const day=S.draft.date;clearTimeout(S.stT);
     // iPhone sender "change" for hvert hjul-tryk: gem først når tiden har ligget stille, og kun hvis den er ændret
@@ -1571,6 +1581,8 @@ function makeDb(sb){
   const chk=({error})=>{if(error)throw {message:error.message.includes("row-level security")?"Du har ikke adgang til at gemme det her":error.message,code:error.code}};
   return {
     loadAll,
+    // RPC der returnerer et opdateret dokument (fx set_round_tee)
+    rpcDoc:async(fn,args,path)=>{const {data,error}=await sb.rpc(fn,args);chk({error});if(data&&path){cache.set(path,data);fire()}},
     doc:path=>({
       set:async d=>{chk(await sb.from("docs").upsert({path,data:d}));cache.set(path,d);fire()},
       update:async d=>{const {data,error}=await sb.rpc("patch_doc",{p_path:path,p_patch:d});chk({error});cache.set(path,data);fire()},

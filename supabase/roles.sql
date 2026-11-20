@@ -1,0 +1,5 @@
+-- Turneringsledere (players/<pid>.coadmin=true): daglig drift som administratoren,
+-- men ikke sæsonplan (config/periods), pointmodel (config/season), roller eller sletning af medlemmer.
+-- is_owner() = står i admins-tabellen (Kim). is_admin() = ejer eller turneringsleder.
+-- set_round_tee(): spiller retter egen tee, markør retter tee for alle i sin bold.
+-- Selve funktionerne er lagt i databasen 20/11-2026; se can_write, is_owner, is_admin, set_round_tee i Supabase.
