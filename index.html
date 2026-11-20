@@ -100,7 +100,7 @@ label.f{display:grid;gap:4px;font-size:13px;color:var(--muted)}
 .sc .bogey{border:1.5px solid var(--ink)}
 .sc .dbl{border:1.5px solid var(--ink);box-shadow:0 0 0 2px var(--surface),0 0 0 3.5px var(--ink)}
 .sc td.c{background:var(--warn-bg);color:var(--warn);font-weight:700}
-.sc td.one{opacity:.6}
+.sc td.one{opacity:.55}.sc td.one .s{outline:1.5px dashed currentColor;outline-offset:1px}
 .alert{background:var(--warn-bg);border:1px solid var(--warn);color:var(--warn);border-radius:10px;padding:10px 14px;font-weight:500}
 .alert ul{margin:4px 0 0;padding-left:18px}
 .alert button{color:var(--warn);border-color:var(--warn);background:transparent;min-height:30px;padding:2px 8px;font-size:13px}
@@ -111,6 +111,10 @@ label.f{display:grid;gap:4px;font-size:13px;color:var(--muted)}
 .strip{display:grid;grid-template-columns:repeat(9,1fr);gap:4px;margin-top:12px}
 .strip button{min-height:32px;padding:0;font-size:13px;border-radius:6px;font-variant-numeric:tabular-nums}
 .strip button.done{background:var(--soft);color:var(--ok);border-color:var(--ok)}
+.strip button.one{color:var(--muted);border:1.5px dashed var(--muted);background:var(--line)}
+.pl.one .val{border-style:dashed;border-color:var(--muted);color:var(--muted);background:var(--line)}
+.pl.ok .val{border-color:var(--ok);color:var(--ok)}
+.pl .cf{font-size:12px;margin-top:4px}.pl.one .cf{color:var(--muted)}.pl.ok .cf{color:var(--ok)}
 .strip button.c{background:var(--warn-bg);color:var(--warn);border-color:var(--warn)}
 .strip button.cur{outline:2px solid var(--flag);outline-offset:1px}
 .pl{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
@@ -173,7 +177,7 @@ button.sm{min-height:32px;padding:4px 10px;font-size:13px}
 <div id="banner"></div>
 <main class="wrap" id="view"><div class="card empty"><p class="muted">Henter runder…</p></div></main>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 53</p>
+<p class="wrap note" style="text-align:center;padding-block:0 24px"><img src="logo.png?v=4" alt="" width="44" height="44" style="display:block;margin:0 auto 6px;opacity:.85">Tirsdagsklubben · web 54</p>
 
 <script>
 /* ---------- Konfiguration (let at justere) ---------- */
@@ -884,19 +888,22 @@ function vEnter(){
   const h=S.hole-1;
   const holeState=i=>{
     let anyC=false,done=true;
-    mates.forEach(p=>{const v=mine.scores[p]?.[i];if(!(v>0))done=false;others.forEach(o=>{const ov=o.scores?.[p]?.[i];if(v>0&&ov>0&&ov!==v)anyC=true})});
-    return anyC?"c":done?"done":"";
+    let unconf=false;
+    mates.forEach(p=>{const v=mine.scores[p]?.[i];if(!(v>0))done=false;else if(needM>1&&!others.some(o=>o.scores?.[p]?.[i]===v))unconf=true;others.forEach(o=>{const ov=o.scores?.[p]?.[i];if(v>0&&ov>0&&ov!==v)anyC=true})});
+    return anyC?"c":done?(unconf?"one":"done"):"";
   };
   const strip=Array.from({length:18},(_,i)=>`<button data-act="hole" data-h="${i+1}" class="${holeState(i)} ${i===h?"cur":""}" aria-label="Hul ${i+1}">${i+1}</button>`).join("");
   const pls=mates.map(p=>{
     const v=mine.scores[p]?.[h];
     const ph=playingHcp((r.hcp?.[p]??D().players[p]?.hi??0),courseR(r.course,teeOf(r,p))),s=strokesOn(ph,c.si[h]);
     const diff=others.map(o=>({by:o.by,v:o.scores?.[p]?.[h]})).filter(o=>o.v>0&&v>0&&o.v!==v);
-    return `<div class="pl ${diff.length?"c":""}">
+    const conf1=v>0&&!diff.length?(needM<2||others.some(o=>o.scores?.[p]?.[h]===v)?"ok":"one"):"";
+    return `<div class="pl ${diff.length?"c":conf1}">
       <div class="who">${esc(pname(p))}${p===me?" (dig)":""}<small>Tee ${esc(teeOf(r,p))} · spillehcp ${ph}${s>0?` · <span class="dots">${"•".repeat(s)}</span> ${s} slag her`:""}</small></div>
       <div class="step"><button data-act="dec" data-pid="${p}" aria-label="Et slag mindre">−</button>
         <div class="val" data-act="par" data-pid="${p}" role="button" tabindex="0" aria-label="Score">${v>0?v:"–"}</div>
         <button data-act="inc" data-pid="${p}" aria-label="Et slag mere">+</button></div>
+      ${conf1==="one"?`<div class="cf">⏳ Kun tastet af dig. Venter på ${others.length?esc(pname(others[0].by)):"den anden markør"}.</div>`:conf1==="ok"&&needM>1?`<div class="cf">✓ Bekræftet af begge markører</div>`:""}
       ${diff.length?`<div class="mm">Afvigelse: ${diff.map(o=>esc(pname(o.by))+" har tastet "+o.v).join(", ")}. Aftal den rigtige score og ret den.</div>`:""}
     </div>`;
   }).join("");
